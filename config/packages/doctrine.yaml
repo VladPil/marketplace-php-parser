@@ -1,0 +1,16 @@
+doctrine:
+    dbal:
+        url: 'pgsql://%env(POSTGRES_USER)%:%env(POSTGRES_PASSWORD)%@%env(POSTGRES_HOST)%:%env(POSTGRES_PORT)%/%env(POSTGRES_DB)%'
+        driver: pdo_pgsql
+        charset: utf8
+    orm:
+        auto_generate_proxy_classes: true
+        naming_strategy: doctrine.orm.naming_strategy.underscore_number_aware
+        auto_mapping: true
+        mappings:
+            App:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Shared/Entity'
+                prefix: 'App\Shared\Entity'
+                alias: App

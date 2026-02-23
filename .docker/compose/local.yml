@@ -1,0 +1,152 @@
+# local.yml — Полное локальное окружение
+# Использование: docker compose -f php-parser/.docker/compose/local.yml --env-file .env up -d
+#
+# Включает:
+# - PostgreSQL 16 + pgvector
+# - Redis 7
+# - Parser — Swoole
+# - Admin — PHP-FPM + Nginx
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: mp-postgres-local
+    environment:
+      POSTGRES_DB: ${MP__POSTGRES__POSTGRES_DB}
+      POSTGRES_USER: ${MP__POSTGRES__POSTGRES_USER}
+      POSTGRES_PASSWORD: ${MP__POSTGRES__POSTGRES_PASSWORD}
+    env_file:
+      - ${PWD}/.env
+    ports:
+      - "${MP__DOCKER__DB_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MP__POSTGRES__POSTGRES_USER} -d ${MP__POSTGRES__POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: mp-redis-local
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+    env_file:
+      - ${PWD}/.env
+    ports:
+      - "${MP__DOCKER__REDIS_PORT}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  parser:
+    build:
+      context: ../..
+      dockerfile: .docker/dockerfiles/parser.Dockerfile
+    container_name: mp-parser-local
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${MP__DB__NAME}
+      POSTGRES_USER: ${MP__DB__USER}
+      POSTGRES_PASSWORD: ${MP__DB__PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: ${MP__REDIS__DB:-0}
+      MP_PROXY_ENABLED: ${MP__PROXY__ENABLED:-false}
+      MP_PROXY_LIST: ${MP__PROXY__LIST:-}
+    env_file:
+      - ${PWD}/.env
+    volumes:
+      - ../../src:/app/src
+      - ../../config:/app/config
+      - ../../templates:/app/templates
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${MP__DOCKER__PARSER_HEALTH_PORT}:${MP__PARSER__HEALTH_PORT}"
+    networks:
+      - mp-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${MP__PARSER__HEALTH_PORT}/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  admin:
+    build:
+      context: ../..
+      dockerfile: .docker/dockerfiles/admin.Dockerfile
+    container_name: mp-admin-local
+    environment:
+      APP_ENV: ${MP__APP__ENV}
+      APP_SECRET: ${MP__APP__SECRET}
+      DATABASE_URL: "postgresql://${MP__DB__USER}:${MP__DB__PASSWORD}@postgres:5432/${MP__DB__NAME}?serverVersion=16"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${MP__DB__NAME}
+      POSTGRES_USER: ${MP__DB__USER}
+      POSTGRES_PASSWORD: ${MP__DB__PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    env_file:
+      - ${PWD}/.env
+    volumes:
+      - ../../src:/var/www/html/src
+      - ../../templates:/var/www/html/templates
+      - ../../config:/var/www/html/config
+      - ../../public:/var/www/html/public
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${MP__DOCKER__ADMIN_PORT}:80"
+    networks:
+      - mp-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      parser:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:80/health/api"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    name: mp-postgres-local-data
+  redis_data:
+    name: mp-redis-local-data
+
+networks:
+  mp-network:
+    name: mp-network-local
+    driver: bridge

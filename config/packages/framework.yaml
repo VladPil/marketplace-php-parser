@@ -1,0 +1,23 @@
+framework:
+    secret: '%env(APP_SECRET)%'
+    php_errors:
+        log: true
+    session:
+        handler_id: null
+        save_path: '%kernel.project_dir%/var/sessions/%kernel.environment%'
+
+parameters:
+    env(APP_SECRET): 'change-me-in-production'
+    env(POSTGRES_HOST): 'mp-postgres'
+    env(POSTGRES_PORT): '5432'
+    env(POSTGRES_DB): 'mp_parser'
+    env(POSTGRES_USER): 'mp'
+    env(POSTGRES_PASSWORD): 'mp_secret'
+    env(REDIS_HOST): 'mp-redis'
+    env(REDIS_PORT): '6379'
+    env(REDIS_DB): '0'
+    env(PARSER_RATE_LIMIT): '5'
+    env(PARSER_WORKERS): '4'
+    env(PARSER_MAX_RETRIES): '3'
+    env(MP_PROXY_LIST): ''
+    env(MP_PROXY_ENABLED): 'false'

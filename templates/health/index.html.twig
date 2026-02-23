@@ -1,0 +1,83 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Здоровье сервисов{% endblock %}
+
+{% block styles %}
+.health-desc { color: #6b7280; font-size: 13px; margin-top: 4px; line-height: 1.5; }
+.health-section { margin-bottom: 24px; }
+.health-section h2 { font-size: 18px; margin-bottom: 4px; }
+.health-section .section-desc { color: #6b7280; font-size: 14px; margin-bottom: 16px; line-height: 1.5; }
+{% endblock %}
+
+{% block content %}
+    <h1>Здоровье сервисов</h1>
+    <p style="color: #6b7280; margin-bottom: 24px; line-height: 1.5;">
+        На этой странице отображается текущий статус всех внешних сервисов, от которых зависит работа парсера.
+        Если какой-то компонент отмечен красным — парсинг может работать некорректно или не работать вовсе.
+    </p>
+
+    <div class="card health-section">
+        <h2>Solver Service</h2>
+        <p class="section-desc">
+            Solver — это отдельный сервис, который управляет браузером для обхода защиты маркетплейсов (капчи, антибот-системы).
+            Без него парсер не сможет получать данные с защищённых страниц.
+        </p>
+
+        <table>
+            <tbody>
+                <tr>
+                    <th style="width: 200px;">Доступность</th>
+                    <td>
+                        {% if solver.available %}
+                            <span class="indicator indicator-green"></span>
+                            <span class="status-ok">Доступен</span>
+                            <div class="health-desc">Сервис отвечает на запросы и готов к работе.</div>
+                        {% else %}
+                            <span class="indicator indicator-red"></span>
+                            <span class="status-fail">Недоступен</span>
+                            <div class="health-desc">Сервис не отвечает. Проверьте, запущен ли контейнер solver-service и доступен ли он по сети.</div>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>Статус</th>
+                    <td>
+                        {% if solver.status == 'ok' or solver.status == 'healthy' %}
+                            <span class="status-ok">{{ solver.status }}</span>
+                            <div class="health-desc">Сервис работает в штатном режиме, все внутренние проверки пройдены.</div>
+                        {% else %}
+                            <span class="status-fail">{{ solver.status }}</span>
+                            <div class="health-desc">Сервис сообщает о проблемах. Возможно, требуется перезапуск или есть ошибки в конфигурации.</div>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>Браузер</th>
+                    <td>
+                        {% if solver.browser is null %}
+                            <span style="color: #999;">Нет данных</span>
+                            <div class="health-desc">Не удалось получить информацию о состоянии браузера. Возможно, solver-сервис не поддерживает эту проверку.</div>
+                        {% elseif solver.browser %}
+                            <span class="indicator indicator-green"></span>
+                            <span class="status-ok">Запущен</span>
+                            <div class="health-desc">Headless-браузер (Chromium) запущен и готов выполнять запросы. Он используется для рендера страниц маркетплейсов и прохождения антибот-защиты.</div>
+                        {% else %}
+                            <span class="indicator indicator-red"></span>
+                            <span class="status-fail">Не запущен</span>
+                            <div class="health-desc">Браузер не запущен — парсинг защищённых страниц невозможен. Проверьте логи solver-service на наличие ошибок запуска Chromium.</div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% if solver.error %}
+                    <tr>
+                        <th>Ошибка</th>
+                        <td>
+                            <span class="status-fail">{{ solver.error }}</span>
+                            <div class="health-desc">Текст ошибки от сервиса. Используйте его для диагностики: проверьте логи контейнера или сетевую доступность.</div>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

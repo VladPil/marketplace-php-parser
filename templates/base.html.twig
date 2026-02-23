@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Админ-панель{% endblock %}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        .layout { display: flex; min-height: 100vh; }
+        .sidebar { width: 220px; background: #1a1a2e; color: #fff; flex-shrink: 0; display: flex; flex-direction: column; }
+        .sidebar-nav { flex: 1; padding: 20px 0; }
+        .sidebar h2 { padding: 0 20px 20px; font-size: 16px; border-bottom: 1px solid #333; margin-bottom: 10px; }
+        .sidebar a { display: block; padding: 10px 20px; color: #ccc; text-decoration: none; font-size: 14px; }
+        .sidebar a:hover, .sidebar a.active { background: #16213e; color: #fff; }
+        .sidebar-status { padding: 12px 20px; border-top: 1px solid #333; }
+        .sidebar-status a { display: flex; align-items: center; padding: 8px 12px; border-radius: 4px; font-size: 13px; transition: background 0.2s; }
+        .sidebar-status a:hover { background: #16213e; text-decoration: none; }
+        .sidebar-status .indicator { width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; flex-shrink: 0; }
+        .sidebar-status .status-text { color: #ccc; }
+        .main { flex: 1; padding: 30px; }
+        .main h1 { margin-bottom: 20px; font-size: 24px; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
+        th { background: #f8f9fa; font-weight: 600; }
+        tr:hover { background: #f8f9fa; }
+        a { color: #2563eb; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; color: #fff; }
+        .badge-debug { background: #6b7280; }
+        .badge-info { background: #3b82f6; }
+        .badge-warning { background: #f59e0b; }
+        .badge-error { background: #ef4444; }
+        .badge-success { background: #16a34a; }
+        .filters { margin-bottom: 20px; display: flex; gap: 8px; }
+        .filters a { padding: 6px 14px; border-radius: 4px; background: #e5e7eb; color: #333; font-size: 13px; }
+        .filters a:hover, .filters a.active { background: #2563eb; color: #fff; text-decoration: none; }
+        .card { background: #fff; border-radius: 6px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; }
+        .status-ok { color: #16a34a; font-weight: 600; }
+        .status-fail { color: #dc2626; font-weight: 600; }
+        .indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+        .indicator-green { background: #16a34a; }
+        .indicator-red { background: #dc2626; }
+        .indicator-gray { background: #6b7280; }
+        .flash { padding: 12px 16px; border-radius: 4px; margin-bottom: 16px; }
+        .flash-success { background: #dcfce7; color: #166534; }
+        .flash-error { background: #fee2e2; color: #991b1b; }
+        .back-link { display: inline-block; margin-bottom: 16px; font-size: 14px; }
+        th[data-sortable] { cursor: pointer; user-select: none; position: relative; padding-right: 22px; }
+        th[data-sortable]::after { content: '↕'; position: absolute; right: 6px; opacity: 0.3; font-size: 12px; }
+        th[data-sortable].sort-asc::after { content: '↑'; opacity: 0.8; }
+        th[data-sortable].sort-desc::after { content: '↓'; opacity: 0.8; }
+
+        /* Общие стили логов задачи */
+        .task-logs-card { margin-top: 16px; }
+        .task-logs-card .card-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+        .task-logs-card .card-header h3 { margin: 0; font-size: 16px; }
+        .task-logs-toggle { background: none; border: 1px solid #ddd; border-radius: 4px; padding: 4px 12px; font-size: 13px; cursor: pointer; color: #555; }
+        .task-logs-toggle:hover { background: #f0f0f0; }
+        .task-logs-body { margin-top: 12px; max-height: 500px; overflow-y: auto; }
+        .log-entry { padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; display: flex; gap: 8px; align-items: flex-start; }
+        .log-entry:last-child { border-bottom: none; }
+        .log-time { color: #999; white-space: nowrap; font-size: 12px; min-width: 140px; }
+        .log-channel { font-size: 11px; padding: 1px 6px; border-radius: 3px; background: #e5e7eb; color: #555; white-space: nowrap; }
+        .log-message { flex: 1; word-break: break-word; }
+        .log-context { font-size: 12px; color: #888; margin-top: 2px; font-family: monospace; white-space: pre-wrap; word-break: break-all; }
+        .log-loading { text-align: center; padding: 20px; color: #999; }
+        .log-empty { text-align: center; padding: 20px; color: #999; }
+
+        {% block styles %}{% endblock %}
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <nav class="sidebar">
+            <div class="sidebar-nav">
+                <h2>Парсер маркетплейсов</h2>
+                <a href="{{ path('dashboard') }}">Дашборд</a>
+                <a href="{{ path('task_list') }}">Задачи</a>
+                <a href="{{ path('product_list') }}">Товары</a>
+                <a href="{{ path('category_list') }}">Категории</a>
+            </div>
+            <div class="sidebar-status" id="sidebar-health">
+                <a href="{{ path('health_dashboard') }}">
+                    <span class="indicator indicator-gray"></span>
+                    <span class="status-text">Проверка...</span>
+                </a>
+            </div>
+        </nav>
+        <div class="main">
+            {% for message in app.flashes('success') %}
+                <div class="flash flash-success">{{ message }}</div>
+            {% endfor %}
+            {% for message in app.flashes('error') %}
+                <div class="flash flash-error">{{ message }}</div>
+            {% endfor %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Сортировка таблиц
+        document.querySelectorAll('th[data-sortable]').forEach(function(th) {
+            th.addEventListener('click', function() {
+                var table = th.closest('table');
+                var tbody = table.querySelector('tbody');
+                var idx = Array.from(th.parentNode.children).indexOf(th);
+                var rows = Array.from(tbody.querySelectorAll('tr'));
+                var asc = !th.classList.contains('sort-asc');
+
+                th.parentNode.querySelectorAll('th').forEach(function(h) {
+                    h.classList.remove('sort-asc', 'sort-desc');
+                });
+                th.classList.add(asc ? 'sort-asc' : 'sort-desc');
+
+                rows.sort(function(a, b) {
+                    var cellA = a.children[idx];
+                    var cellB = b.children[idx];
+                    var valA = cellA.dataset.sortValue !== undefined ? cellA.dataset.sortValue : cellA.textContent.trim();
+                    var valB = cellB.dataset.sortValue !== undefined ? cellB.dataset.sortValue : cellB.textContent.trim();
+                    var numA = parseFloat(valA), numB = parseFloat(valB);
+
+                    if (!isNaN(numA) && !isNaN(numB)) {
+                        return asc ? numA - numB : numB - numA;
+                    }
+                    return asc ? valA.localeCompare(valB, 'ru') : valB.localeCompare(valA, 'ru');
+                });
+
+                rows.forEach(function(row) { tbody.appendChild(row); });
+            });
+        });
+
+        // Проверка здоровья системы
+        (function checkHealth() {
+            fetch('{{ path("health_api") }}')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var el = document.getElementById('sidebar-health');
+                    var ok = data.status === 'ok' || (data.solver && data.solver.available === true);
+                    el.querySelector('.indicator').className = 'indicator ' + (ok ? 'indicator-green' : 'indicator-red');
+                    el.querySelector('.status-text').textContent = ok ? 'Система ОК' : 'Проблемы';
+                })
+                .catch(function() {
+                    var el = document.getElementById('sidebar-health');
+                    el.querySelector('.indicator').className = 'indicator indicator-red';
+                    el.querySelector('.status-text').textContent = 'Проблемы';
+                });
+        })();
+
+        // Общая функция загрузки логов задачи
+        window.loadTaskLogs = function(taskId, containerId) {
+            var container = document.getElementById(containerId);
+            if (!container) return;
+            var body = container.querySelector('.task-logs-body');
+            if (body.dataset.loaded === '1') return;
+            body.innerHTML = '<div class="log-loading">Загрузка логов...</div>';
+
+            fetch('/tasks/' + taskId + '/logs')
+                .then(function(r) { return r.json(); })
+                .then(function(logs) {
+                    body.dataset.loaded = '1';
+                    if (!logs.length) {
+                        body.innerHTML = '<div class="log-empty">Логов нет</div>';
+                        return;
+                    }
+                    var html = '';
+                    logs.forEach(function(log) {
+                        html += '<div class="log-entry">';
+                        html += '<span class="log-time">' + (log.created_at || '') + '</span>';
+                        html += '<span class="log-channel badge badge-' + (log.level || 'info') + '">' + (log.channel || '') + '</span>';
+                        html += '<div><div class="log-message">' + escapeHtml(log.message || '') + '</div>';
+                        if (log.context && Object.keys(log.context).length > 0) {
+                            html += '<div class="log-context">' + escapeHtml(JSON.stringify(log.context, null, 2)) + '</div>';
+                        }
+                        html += '</div></div>';
+                    });
+                    body.innerHTML = html;
+                })
+                .catch(function() {
+                    body.innerHTML = '<div class="log-empty">Ошибка загрузки логов</div>';
+                });
+        };
+
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

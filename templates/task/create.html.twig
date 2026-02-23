@@ -1,0 +1,860 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Создать задачу — Админ-панель{% endblock %}
+
+{% block styles %}
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 14px; }
+    .form-group input, .form-group select { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; width: 100%; max-width: 400px; }
+    .form-group small { display: block; color: #6b7280; margin-top: 4px; font-size: 12px; }
+    .task-params { display: none; }
+    .task-params.active { display: block; }
+    .checkbox-label { display: flex !important; align-items: center; gap: 8px; font-weight: 400 !important; cursor: pointer; }
+    .checkbox-label input[type="checkbox"] { width: auto !important; max-width: none !important; margin: 0; cursor: pointer; }
+    .btn-submit { padding: 10px 20px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+    .btn-submit:hover { background: #1d4ed8; }
+    .btn-submit:disabled { background: #9ca3af; cursor: not-allowed; }
+
+    /* Переключатель режимов */
+    .mode-toggle { display: flex; gap: 0; margin-top: 4px; }
+    .mode-btn { padding: 8px 20px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; font-size: 14px; color: #374151; transition: all 0.15s; }
+    .mode-btn:first-child { border-radius: 4px 0 0 4px; }
+    .mode-btn:last-child { border-radius: 0 4px 4px 0; border-left: none; }
+    .mode-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .mode-btn:not(.active):hover { background: #f3f4f6; }
+
+    /* Зона загрузки файла */
+    .file-upload-section { margin-top: 16px; }
+    .file-drop-zone { border: 2px dashed #d1d5db; border-radius: 8px; padding: 32px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; position: relative; }
+    .file-drop-zone:hover { border-color: #93c5fd; background: #f0f7ff; }
+    .file-drop-zone.drag-over { border-color: #2563eb; background: #eff6ff; }
+    .file-drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .file-drop-zone p { margin: 8px 0; color: #6b7280; font-size: 14px; }
+    .file-drop-zone .file-icon { font-size: 32px; color: #9ca3af; margin-bottom: 4px; }
+    .file-link { color: #2563eb; text-decoration: underline; cursor: pointer; }
+
+    /* Форматы - примеры */
+    .format-examples { margin-top: 16px; }
+    .format-tabs { display: flex; gap: 0; margin-bottom: 0; }
+    .format-tab { padding: 6px 14px; border: 1px solid #d1d5db; border-bottom: none; background: #f9fafb; cursor: pointer; font-size: 12px; font-weight: 600; color: #6b7280; transition: all 0.15s; }
+    .format-tab:first-child { border-radius: 4px 0 0 0; }
+    .format-tab:last-child { border-radius: 0 4px 0 0; }
+    .format-tab.active { background: #fff; color: #111827; border-bottom-color: #fff; position: relative; z-index: 1; }
+    .format-tab-csv.active { color: #166534; }
+    .format-tab-txt.active { color: #1e40af; }
+    .format-tab-json.active { color: #92400e; }
+    .format-content { display: none; border: 1px solid #d1d5db; border-radius: 0 4px 4px 4px; padding: 12px; background: #fff; font-family: monospace; font-size: 12px; line-height: 1.6; color: #374151; white-space: pre; overflow-x: auto; }
+    .format-content.active { display: block; }
+
+    /* Предпросмотр файла */
+    .file-preview { margin-top: 20px; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; }
+    .file-preview-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; flex-wrap: wrap; }
+    .file-badge { padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .file-badge-csv { background: #dcfce7; color: #166534; }
+    .file-badge-txt { background: #dbeafe; color: #1e40af; }
+    .file-badge-json { background: #fef3c7; color: #92400e; }
+    .file-stats { font-size: 13px; color: #374151; }
+    .file-stats strong { font-weight: 600; }
+    .file-stats .stat-valid { color: #16a34a; }
+    .file-stats .stat-invalid { color: #dc2626; }
+    .btn-remove { margin-left: auto; padding: 4px 12px; background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; border-radius: 4px; cursor: pointer; font-size: 12px; transition: background 0.15s; }
+    .btn-remove:hover { background: #fecaca; }
+    .btn-validate { padding: 4px 12px; background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; border-radius: 4px; cursor: pointer; font-size: 12px; transition: background 0.15s; }
+    .btn-validate:hover { background: #bfdbfe; }
+    .btn-validate:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Таблица предпросмотра */
+    .preview-table { width: 100%; }
+    .preview-table th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; }
+    .preview-table td { font-size: 13px; }
+    .preview-table .raw-value { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace; font-size: 12px; }
+    .preview-table .type-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+    .type-url { background: #dbeafe; color: #1e40af; }
+    .type-slug { background: #f3e8ff; color: #6b21a8; }
+    .type-id { background: #e0e7ff; color: #3730a3; }
+    .row-valid td { }
+    .row-invalid td { background: #fef2f2; }
+    .row-invalid td:first-child { border-left: 3px solid #ef4444; }
+    .error-text { color: #dc2626; font-size: 12px; }
+    .more-rows { text-align: center; padding: 12px; color: #6b7280; font-size: 13px; background: #f9fafb; }
+
+    /* Подсказки */
+    .file-hints { padding: 12px 16px; background: #fffbeb; border-top: 1px solid #fde68a; }
+    .file-hints ul { margin: 0; padding: 0 0 0 18px; }
+    .file-hints li { font-size: 13px; color: #92400e; margin-bottom: 4px; }
+    .file-hints li:last-child { margin-bottom: 0; }
+
+    /* Ошибка загрузки */
+    .file-error { margin-top: 12px; padding: 12px 16px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; color: #991b1b; font-size: 13px; }
+
+    /* Спиннер */
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #d1d5db; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+{% endblock %}
+
+{% block content %}
+<a href="{{ path('task_list') }}" class="back-link">&larr; К списку задач</a>
+<h1>Создать задачу парсинга</h1>
+
+<div class="card">
+    <form method="post" id="taskForm">
+        <div class="form-group">
+            <label for="marketplace">Маркетплейс</label>
+            <select name="marketplace" id="marketplace">
+                <option value="ozon" selected>Ozon</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="type">Тип задачи</label>
+            <select name="type" id="type">
+                <option value="">— Выберите тип —</option>
+                <option value="search">Поиск товаров</option>
+                <option value="product">Парсинг товара</option>
+                <option value="reviews">Парсинг отзывов</option>
+            </select>
+        </div>
+
+        {# Переключатель режима: одиночный / файл #}
+        <div class="form-group" id="modeSection" style="display:none">
+            <label>Режим создания</label>
+            <div class="mode-toggle">
+                <button type="button" class="mode-btn active" data-mode="single">Один товар</button>
+                <button type="button" class="mode-btn" data-mode="file">Загрузка из файла</button>
+            </div>
+        </div>
+
+        {# === Параметры для одиночного режима === #}
+        <div id="params-search" class="task-params">
+            <div class="form-group">
+                <label for="query">Поисковый запрос</label>
+                <input type="text" name="query" id="query" placeholder="Например: наушники bluetooth">
+            </div>
+            <div class="form-group">
+                <label for="max_products">Макс. товаров</label>
+                <input type="number" name="max_products" id="max_products" value="100" min="1" max="1000">
+            </div>
+        </div>
+
+        {# Общие поля для product и reviews (один набор — без дублей name) #}
+        <div id="params-item" class="task-params">
+            <div class="form-group">
+                <label for="external_id">External ID товара</label>
+                <input type="number" name="external_id" id="external_id" placeholder="Например: 123456789">
+                <small>ID товара на маркетплейсе (число из URL)</small>
+            </div>
+            <div class="form-group">
+                <label for="slug">Slug товара</label>
+                <input type="text" name="slug" id="slug" placeholder="Например: naushniki-bluetooth-123456789">
+                <small>Slug из URL товара на маркетплейсе</small>
+            </div>
+        </div>
+
+        {# Параметры фильтрации отзывов: временной отрезок ИЛИ кол-во страниц #}
+        <div id="params-reviews-extra" class="task-params">
+            <div class="form-group">
+                <label>Режим сбора отзывов</label>
+                <div class="mode-toggle">
+                    <button type="button" class="mode-btn active" data-review-mode="period">За период</button>
+                    <button type="button" class="mode-btn" data-review-mode="pages">По кол-ву страниц</button>
+                </div>
+            </div>
+
+            <div id="review-period-group">
+                <div class="form-group">
+                    <label for="review_period">Период сбора</label>
+                    <select name="review_period" id="review_period">
+                        <option value="1w">За последнюю неделю</option>
+                        <option value="1m" selected>За последний месяц</option>
+                        <option value="3m">За 3 месяца</option>
+                        <option value="6m">За 6 месяцев</option>
+                        <option value="1y">За год</option>
+                        <option value="custom">Указать дату</option>
+                    </select>
+                </div>
+                <div class="form-group" id="custom-date-group" style="display:none">
+                    <label for="date_from">Собирать отзывы начиная с</label>
+                    <input type="date" name="date_from" id="date_from">
+                    <small>Будут собраны отзывы от этой даты до сегодня (сортировка: сначала новые)</small>
+                </div>
+            </div>
+
+            <div id="review-pages-group" style="display:none">
+                <div class="form-group">
+                    <label for="max_pages">Макс. страниц отзывов</label>
+                    <input type="number" name="max_pages" id="max_pages" value="10" min="1" max="100">
+                    <small>На каждой странице ~3 отзыва</small>
+                </div>
+            </div>
+        </div>
+
+        {# Чекбокс сбора данных о товаре (только для reviews) #}
+        <div id="collect-product-data-group" class="task-params">
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="collect_product_data" id="collectProductData" value="1">
+                    Собрать данные о товаре (цена, картинки, описание)
+                </label>
+                <small>Создаст подзадачу парсинга товара перед сбором отзывов</small>
+            </div>
+        </div>
+
+        {# === Блок загрузки файла === #}
+        <div id="fileUploadSection" class="file-upload-section" style="display:none">
+            <div class="form-group">
+                <label>Файл с товарами</label>
+                <div class="file-drop-zone" id="dropZone">
+                    <input type="file" name="file" id="fileInput" accept=".csv,.txt,.json">
+                    <div class="file-icon">&#128196;</div>
+                    <p>Перетащите файл сюда или <span class="file-link">выберите</span></p>
+                    <small>Поддерживаемые форматы: CSV, TXT, JSON. Макс. 2 МБ, до 1000 записей.</small>
+                </div>
+            </div>
+
+            {# Примеры форматов #}
+            <div class="format-examples">
+                <div class="format-tabs">
+                    <div class="format-tab format-tab-csv active" data-format="csv">CSV</div>
+                    <div class="format-tab format-tab-txt" data-format="txt">TXT</div>
+                    <div class="format-tab format-tab-json" data-format="json">JSON</div>
+                </div>
+                <div class="format-content active" id="format-csv">https://www.ozon.ru/product/naushniki-bluetooth-123456789/
+naushniki-jbl-987654321
+123456789
+456789012</div>
+                <div class="format-content" id="format-txt">https://www.ozon.ru/product/naushniki-bluetooth-123456789/
+naushniki-jbl-987654321
+123456789
+456789012</div>
+                <div class="format-content" id="format-json">[
+  "https://www.ozon.ru/product/naushniki-bluetooth-123456789/",
+  "naushniki-jbl-987654321",
+  123456789,
+  456789012
+]</div>
+            </div>
+
+            {# Ошибка загрузки файла #}
+            <div id="fileError" class="file-error" style="display:none"></div>
+
+            {# Предпросмотр файла #}
+            <div id="filePreview" class="file-preview" style="display:none">
+                <div class="file-preview-header">
+                    <span id="fileBadge" class="file-badge"></span>
+                    <span id="fileName" style="font-size:13px;color:#374151"></span>
+                    <span id="fileStats" class="file-stats"></span>
+                    <button type="button" id="btnValidate" class="btn-validate">Провалидировать на сервере</button>
+                    <button type="button" id="btnRemoveFile" class="btn-remove">Удалить</button>
+                </div>
+                <div id="fileItemsTable"></div>
+                <div id="fileHints" class="file-hints" style="display:none"></div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-submit" id="btnSubmit">Создать задачу</button>
+    </form>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    // === Состояние ===
+    var currentMode = 'single';
+    var currentType = '';
+    var parsedItems = [];
+    var selectedFile = null;
+    var currentReviewMode = 'period';
+
+    // === DOM-элементы ===
+    var form = document.getElementById('taskForm');
+    var typeSelect = document.getElementById('type');
+    var modeSection = document.getElementById('modeSection');
+    var fileUploadSection = document.getElementById('fileUploadSection');
+    var dropZone = document.getElementById('dropZone');
+    var fileInput = document.getElementById('fileInput');
+    var filePreview = document.getElementById('filePreview');
+    var fileError = document.getElementById('fileError');
+    var fileBadge = document.getElementById('fileBadge');
+    var fileName = document.getElementById('fileName');
+    var fileStats = document.getElementById('fileStats');
+    var fileItemsTable = document.getElementById('fileItemsTable');
+    var fileHints = document.getElementById('fileHints');
+    var btnRemoveFile = document.getElementById('btnRemoveFile');
+    var btnValidate = document.getElementById('btnValidate');
+    var btnSubmit = document.getElementById('btnSubmit');
+
+    // === Константы ===
+    var MAX_FILE_SIZE = 2 * 1024 * 1024;
+    var ALLOWED_EXTENSIONS = ['csv', 'txt', 'json'];
+    var MARKETPLACE_URL_PATTERN = /ozon\.ru\/product\/([a-z0-9-]+)-(\d+)/i;
+    var SLUG_WITH_ID_PATTERN = /^([a-z0-9][a-z0-9-]*)-(\d{5,})$/;
+    var NUMERIC_ID_PATTERN = /^\d{5,}$/;
+
+    // === Распознавание значений (дублирует серверную логику) ===
+    function recognizeValue(raw) {
+        var value = raw.trim();
+        if (!value) return { externalId: null, slug: null, url: null, type: 'unknown', valid: false, error: 'Пустая строка', rawValue: raw };
+
+        var m;
+        // URL маркетплейса
+        m = value.match(MARKETPLACE_URL_PATTERN);
+        if (m) {
+            return { externalId: parseInt(m[2]), slug: m[1] + '-' + m[2], url: value, type: 'url', valid: true, error: null, rawValue: raw };
+        }
+        // Slug с ID
+        m = value.match(SLUG_WITH_ID_PATTERN);
+        if (m) {
+            return { externalId: parseInt(m[2]), slug: value, url: null, type: 'slug', valid: true, error: null, rawValue: raw };
+        }
+        // Числовой ID
+        if (NUMERIC_ID_PATTERN.test(value)) {
+            return { externalId: parseInt(value), slug: null, url: null, type: 'id', valid: true, error: null, rawValue: raw };
+        }
+        return { externalId: null, slug: null, url: null, type: 'unknown', valid: false, error: 'Не распознано', rawValue: raw };
+    }
+
+    // === Парсинг файла на клиенте ===
+    function parseFileContent(content, extension) {
+        var values = [];
+
+        if (extension === 'json') {
+            try {
+                var data = JSON.parse(content);
+                if (Array.isArray(data)) {
+                    values = flattenJsonArray(data);
+                } else if (data && typeof data === 'object') {
+                    var keys = ['items', 'products', 'urls', 'data', 'list'];
+                    for (var i = 0; i < keys.length; i++) {
+                        if (Array.isArray(data[keys[i]])) {
+                            values = flattenJsonArray(data[keys[i]]);
+                            break;
+                        }
+                    }
+                }
+            } catch (e) {
+                return [{ externalId: null, slug: null, url: null, type: 'unknown', valid: false, error: 'Невалидный JSON: ' + e.message, rawValue: 'JSON', lineNumber: 1 }];
+            }
+        } else {
+            // CSV и TXT — построчно
+            var lines = content.split(/\r?\n/).filter(function(l) { return l.trim() !== ''; });
+            var headerKeywords = ['id', 'url', 'slug', 'external_id', 'product', 'link'];
+
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+                var val = line;
+
+                if (extension === 'csv') {
+                    // Берём первый столбец
+                    var sep = line.indexOf(';') >= 0 ? ';' : (line.indexOf('\t') >= 0 ? '\t' : ',');
+                    val = line.split(sep)[0].trim().replace(/^["']|["']$/g, '');
+                }
+
+                // Пропускаем заголовок
+                if (i === 0) {
+                    var lower = val.toLowerCase();
+                    var isHeader = false;
+                    for (var k = 0; k < headerKeywords.length; k++) {
+                        if (lower.indexOf(headerKeywords[k]) >= 0) { isHeader = true; break; }
+                    }
+                    if (isHeader) continue;
+                }
+
+                values.push(val);
+            }
+        }
+
+        // Распознаём каждое значение
+        var items = [];
+        for (var j = 0; j < values.length; j++) {
+            var item = recognizeValue(String(values[j]));
+            item.lineNumber = j + 1;
+            items.push(item);
+        }
+
+        return items;
+    }
+
+    function flattenJsonArray(arr) {
+        var result = [];
+        for (var i = 0; i < arr.length; i++) {
+            var item = arr[i];
+            if (item === null || item === undefined) continue;
+            if (typeof item === 'object' && !Array.isArray(item)) {
+                result.push(String(item.external_id || item.id || item.url || item.slug || ''));
+            } else {
+                result.push(String(item));
+            }
+        }
+        return result;
+    }
+
+    // === Утилиты ===
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+    }
+
+    function truncate(str, len) {
+        if (!str) return '';
+        return str.length > len ? str.substring(0, len) + '...' : str;
+    }
+
+    function getExtension(filename) {
+        return (filename.split('.').pop() || '').toLowerCase();
+    }
+
+    // === Переключение типа задачи ===
+    typeSelect.addEventListener('change', function() {
+        currentType = this.value;
+        // Показать/скрыть переключатель режимов
+        if (currentType === 'product' || currentType === 'reviews') {
+            modeSection.style.display = '';
+        } else {
+            modeSection.style.display = 'none';
+            setMode('single');
+        }
+        toggleParams();
+    });
+
+    function toggleParams() {
+        document.querySelectorAll('.task-params').forEach(function(el) { el.classList.remove('active'); });
+        if (currentMode === 'single' && currentType) {
+            if (currentType === 'search') {
+                var el = document.getElementById('params-search');
+                if (el) el.classList.add('active');
+            } else if (currentType === 'product' || currentType === 'reviews') {
+                // Общие поля slug/external_id для product и reviews
+                var itemEl = document.getElementById('params-item');
+                if (itemEl) itemEl.classList.add('active');
+                // Доп. поле max_pages только для reviews
+                if (currentType === 'reviews') {
+                    var extraEl = document.getElementById('params-reviews-extra');
+                    if (extraEl) extraEl.classList.add('active');
+                    var collectEl = document.getElementById('collect-product-data-group');
+                    if (collectEl) collectEl.classList.add('active');
+                }
+            }
+        }
+    }
+
+    // === Переключение режима ===
+    document.querySelectorAll('.mode-btn[data-mode]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            setMode(this.getAttribute('data-mode'));
+        });
+    });
+
+    function setMode(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.mode-btn[data-mode]').forEach(function(b) {
+            b.classList.toggle('active', b.getAttribute('data-mode') === mode);
+        });
+
+        if (mode === 'file') {
+            fileUploadSection.style.display = '';
+            toggleParams(); // скроет одиночные параметры
+            updateSubmitButton();
+        } else {
+            fileUploadSection.style.display = 'none';
+            toggleParams();
+            btnSubmit.textContent = 'Создать задачу';
+            btnSubmit.disabled = false;
+        }
+    }
+
+
+    // === Переключение режима сбора отзывов (период / страницы) ===
+    document.querySelectorAll('.mode-btn[data-review-mode]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            currentReviewMode = this.getAttribute('data-review-mode');
+            document.querySelectorAll('.mode-btn[data-review-mode]').forEach(function(b) {
+                b.classList.toggle('active', b.getAttribute('data-review-mode') === currentReviewMode);
+            });
+            var periodGroup = document.getElementById('review-period-group');
+            var pagesGroup = document.getElementById('review-pages-group');
+            if (currentReviewMode === 'period') {
+                periodGroup.style.display = '';
+                pagesGroup.style.display = 'none';
+            } else {
+                periodGroup.style.display = 'none';
+                pagesGroup.style.display = '';
+            }
+        });
+    });
+
+    // === Переключение кастомной даты ===
+    var reviewPeriodSelect = document.getElementById('review_period');
+    if (reviewPeriodSelect) {
+        reviewPeriodSelect.addEventListener('change', function() {
+            var customGroup = document.getElementById('custom-date-group');
+            customGroup.style.display = this.value === 'custom' ? '' : 'none';
+        });
+    }
+
+    // === Табы форматов ===
+    document.querySelectorAll('.format-tab').forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.format-tab').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.format-content').forEach(function(c) { c.classList.remove('active'); });
+            this.classList.add('active');
+            document.getElementById('format-' + this.getAttribute('data-format')).classList.add('active');
+        });
+    });
+
+    // === Drag & Drop ===
+    dropZone.addEventListener('dragover', function(e) { e.preventDefault(); this.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', function() { this.classList.remove('drag-over'); });
+    dropZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        this.classList.remove('drag-over');
+        if (e.dataTransfer.files.length) {
+            handleFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    fileInput.addEventListener('change', function() {
+        if (this.files[0]) handleFile(this.files[0]);
+    });
+
+    // === Обработка файла ===
+    function handleFile(file) {
+        selectedFile = null;
+        parsedItems = [];
+        hideError();
+        hidePreview();
+
+        // Проверка расширения
+        var ext = getExtension(file.name);
+        if (ALLOWED_EXTENSIONS.indexOf(ext) < 0) {
+            showError('Формат ".' + ext + '" не поддерживается. Используйте CSV, TXT или JSON.');
+            return;
+        }
+
+        // Проверка размера
+        if (file.size > MAX_FILE_SIZE) {
+            showError('Файл слишком большой (' + (file.size / 1024 / 1024).toFixed(1) + ' МБ). Максимум: 2 МБ.');
+            return;
+        }
+
+        // Проверка что файл не пуст
+        if (file.size === 0) {
+            showError('Файл пуст.');
+            return;
+        }
+
+        selectedFile = file;
+
+        // Читаем и парсим
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var content = e.target.result;
+            parsedItems = parseFileContent(content, ext);
+
+            if (parsedItems.length === 0) {
+                showError('Файл не содержит данных для парсинга.');
+                return;
+            }
+
+            renderPreview(file, ext, parsedItems);
+            updateSubmitButton();
+        };
+        reader.onerror = function() {
+            showError('Не удалось прочитать файл.');
+        };
+        reader.readAsText(file, 'UTF-8');
+    }
+
+    // === Отображение предпросмотра ===
+    function renderPreview(file, ext, items) {
+        filePreview.style.display = '';
+
+        // Бейдж формата
+        fileBadge.textContent = ext.toUpperCase();
+        fileBadge.className = 'file-badge file-badge-' + ext;
+
+        // Имя файла
+        fileName.textContent = file.name + ' (' + formatSize(file.size) + ')';
+
+        // Статистика
+        var validCount = 0, invalidCount = 0;
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].valid) validCount++; else invalidCount++;
+        }
+        fileStats.innerHTML =
+            'Распознано: <strong class="stat-valid">' + validCount + '</strong>' +
+            ' | Ошибок: <strong class="stat-invalid">' + invalidCount + '</strong>' +
+            ' | Всего: <strong>' + items.length + '</strong>';
+
+        // Таблица
+        var html = '<table class="preview-table"><thead><tr>' +
+            '<th>#</th><th>Исходное значение</th><th>Тип</th><th>External ID</th><th>Slug</th><th>Статус</th>' +
+            '</tr></thead><tbody>';
+
+        var limit = Math.min(items.length, 50);
+        for (var j = 0; j < limit; j++) {
+            var item = items[j];
+            var rowClass = item.valid ? 'row-valid' : 'row-invalid';
+            var typeLabel = item.type === 'url' ? 'URL' : item.type === 'slug' ? 'Slug' : item.type === 'id' ? 'ID' : '—';
+            var typeClass = item.type !== 'unknown' ? 'type-' + item.type : '';
+
+            html += '<tr class="' + rowClass + '">' +
+                '<td>' + (item.lineNumber || (j + 1)) + '</td>' +
+                '<td class="raw-value" title="' + escapeHtml(item.rawValue) + '">' + escapeHtml(truncate(item.rawValue, 60)) + '</td>' +
+                '<td>' + (typeClass ? '<span class="type-badge ' + typeClass + '">' + typeLabel + '</span>' : '—') + '</td>' +
+                '<td>' + (item.externalId || '—') + '</td>' +
+                '<td class="raw-value">' + escapeHtml(truncate(item.slug || '—', 40)) + '</td>' +
+                '<td>' + (item.valid ? '<span class="status-ok">OK</span>' : '<span class="error-text">' + escapeHtml(item.error || 'Ошибка') + '</span>') + '</td>' +
+                '</tr>';
+        }
+
+        html += '</tbody></table>';
+
+        if (items.length > 50) {
+            html += '<div class="more-rows">... и ещё ' + (items.length - 50) + ' записей</div>';
+        }
+
+        fileItemsTable.innerHTML = html;
+
+        // Подсказки
+        var hints = generateHints(items, ext);
+        if (hints.length > 0) {
+            fileHints.style.display = '';
+            var hintsHtml = '<ul>';
+            for (var h = 0; h < hints.length; h++) {
+                hintsHtml += '<li>' + escapeHtml(hints[h]) + '</li>';
+            }
+            hintsHtml += '</ul>';
+            fileHints.innerHTML = hintsHtml;
+        } else {
+            fileHints.style.display = 'none';
+        }
+    }
+
+    function generateHints(items, ext) {
+        var hints = [];
+        var validCount = 0, invalidCount = 0;
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].valid) validCount++; else invalidCount++;
+        }
+
+        if (invalidCount === items.length) {
+            hints.push('Ни одна запись не распознана. Убедитесь, что файл содержит ID товаров маркетплейса (числа от 5 цифр), URL или slug.');
+        } else if (invalidCount > 0) {
+            hints.push(invalidCount + ' из ' + items.length + ' записей не распознаны и будут пропущены при создании задач.');
+        }
+
+        if (ext === 'csv') {
+            hints.push('CSV: каждая строка — один товар. Первый столбец: URL маркетплейса, external_id или slug.');
+        } else if (ext === 'json') {
+            hints.push('JSON: массив значений [123, "slug-123", "https://..."] или объект {"items": [...]}.');
+        } else if (ext === 'txt') {
+            hints.push('TXT: одно значение на строку — URL маркетплейса, external_id или slug.');
+        }
+
+        if (items.length > 500) {
+            hints.push('Большой файл (' + items.length + ' записей). Создание задач может занять некоторое время.');
+        }
+
+        return hints;
+    }
+
+    function formatSize(bytes) {
+        if (bytes < 1024) return bytes + ' Б';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
+        return (bytes / 1024 / 1024).toFixed(1) + ' МБ';
+    }
+
+    // === Ошибки ===
+    function showError(msg) {
+        fileError.style.display = '';
+        fileError.textContent = msg;
+    }
+
+    function hideError() {
+        fileError.style.display = 'none';
+        fileError.textContent = '';
+    }
+
+    function hidePreview() {
+        filePreview.style.display = 'none';
+        fileItemsTable.innerHTML = '';
+        fileHints.style.display = 'none';
+    }
+
+    // === Удалить файл ===
+    btnRemoveFile.addEventListener('click', function() {
+        selectedFile = null;
+        parsedItems = [];
+        fileInput.value = '';
+        hidePreview();
+        hideError();
+        updateSubmitButton();
+    });
+
+    // === Серверная валидация ===
+    btnValidate.addEventListener('click', function() {
+        if (!selectedFile) return;
+
+        btnValidate.disabled = true;
+        btnValidate.innerHTML = '<span class="spinner"></span>Валидация...';
+
+        var formData = new FormData();
+        formData.append('file', selectedFile);
+
+        fetch('{{ path("task_validate_file") }}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            btnValidate.disabled = false;
+            btnValidate.textContent = 'Провалидировать на сервере';
+
+            if (data.error) {
+                showError('Сервер: ' + data.error);
+                return;
+            }
+
+            // Обновляем предпросмотр серверными данными
+            if (data.items && data.items.length > 0) {
+                parsedItems = data.items;
+                fileStats.innerHTML =
+                    'Распознано: <strong class="stat-valid">' + data.valid + '</strong>' +
+                    ' | Ошибок: <strong class="stat-invalid">' + data.invalid + '</strong>' +
+                    ' | Всего: <strong>' + data.total + '</strong>' +
+                    ' <span style="color:#16a34a;font-size:11px">(проверено сервером)</span>';
+
+                // Перерисовываем таблицу с серверными данными
+                renderServerItems(data.items);
+            }
+
+            // Показываем серверные подсказки
+            if (data.hints && data.hints.length > 0) {
+                fileHints.style.display = '';
+                var hintsHtml = '<ul>';
+                for (var i = 0; i < data.hints.length; i++) {
+                    hintsHtml += '<li>' + escapeHtml(data.hints[i]) + '</li>';
+                }
+                hintsHtml += '</ul>';
+                fileHints.innerHTML = hintsHtml;
+            }
+
+            updateSubmitButton();
+        })
+        .catch(function(err) {
+            btnValidate.disabled = false;
+            btnValidate.textContent = 'Провалидировать на сервере';
+            showError('Ошибка соединения с сервером: ' + err.message);
+        });
+    });
+
+    function renderServerItems(items) {
+        var html = '<table class="preview-table"><thead><tr>' +
+            '<th>#</th><th>Исходное значение</th><th>Тип</th><th>External ID</th><th>Slug</th><th>Статус</th>' +
+            '</tr></thead><tbody>';
+
+        var limit = Math.min(items.length, 50);
+        for (var j = 0; j < limit; j++) {
+            var item = items[j];
+            var rowClass = item.valid ? 'row-valid' : 'row-invalid';
+            var typeLabel = item.type === 'url' ? 'URL' : item.type === 'slug' ? 'Slug' : item.type === 'id' ? 'ID' : '—';
+            var typeClass = item.type !== 'unknown' ? 'type-' + item.type : '';
+
+            html += '<tr class="' + rowClass + '">' +
+                '<td>' + item.lineNumber + '</td>' +
+                '<td class="raw-value" title="' + escapeHtml(item.rawValue) + '">' + escapeHtml(truncate(item.rawValue, 60)) + '</td>' +
+                '<td>' + (typeClass ? '<span class="type-badge ' + typeClass + '">' + typeLabel + '</span>' : '—') + '</td>' +
+                '<td>' + (item.externalId || '—') + '</td>' +
+                '<td class="raw-value">' + escapeHtml(truncate(item.slug || '—', 40)) + '</td>' +
+                '<td>' + (item.valid ? '<span class="status-ok">OK</span>' : '<span class="error-text">' + escapeHtml(item.error || 'Ошибка') + '</span>') + '</td>' +
+                '</tr>';
+        }
+
+        html += '</tbody></table>';
+
+        if (items.length < parsedItems.length) {
+            html += '<div class="more-rows">Показано ' + items.length + ' из ' + parsedItems.length + ' записей</div>';
+        }
+
+        fileItemsTable.innerHTML = html;
+    }
+
+    // === Обновление кнопки отправки ===
+    function updateSubmitButton() {
+        if (currentMode !== 'file') {
+            btnSubmit.textContent = 'Создать задачу';
+            btnSubmit.disabled = false;
+            return;
+        }
+
+        if (!selectedFile || parsedItems.length === 0) {
+            btnSubmit.textContent = 'Загрузите файл';
+            btnSubmit.disabled = true;
+            return;
+        }
+
+        var validCount = 0;
+        for (var i = 0; i < parsedItems.length; i++) {
+            if (parsedItems[i].valid !== false) validCount++;
+        }
+
+        if (validCount === 0) {
+            btnSubmit.textContent = 'Нет валидных записей';
+            btnSubmit.disabled = true;
+            return;
+        }
+
+        btnSubmit.textContent = 'Создать ' + validCount + ' задач';
+        btnSubmit.disabled = false;
+    }
+
+    // === Отправка формы ===
+    form.addEventListener('submit', function(e) {
+        if (currentMode !== 'file') return; // Стандартная отправка для одиночного режима
+
+        e.preventDefault();
+
+        if (!selectedFile) return;
+
+        var typeValue = typeSelect.value;
+        if (!typeValue || (typeValue !== 'product' && typeValue !== 'reviews')) {
+            showError('Для массовой загрузки выберите тип: "Парсинг товара" или "Парсинг отзывов"');
+            return;
+        }
+
+        btnSubmit.disabled = true;
+        btnSubmit.innerHTML = '<span class="spinner"></span>Создание задач...';
+
+        var formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('type', typeValue);
+        formData.append('marketplace', document.getElementById('marketplace').value);
+        var collectCheckbox = document.getElementById('collectProductData');
+        if (collectCheckbox && collectCheckbox.checked) {
+            formData.append('collect_product_data', '1');
+        }
+
+        fetch('{{ path("task_create_batch") }}', {
+            method: 'POST',
+            body: formData,
+            redirect: 'follow'
+        })
+        .then(function(response) {
+            // Сервер делает redirect на список задач
+            if (response.redirected) {
+                window.location.href = response.url;
+            } else {
+                window.location.href = '{{ path("task_list") }}';
+            }
+        })
+        .catch(function(err) {
+            btnSubmit.disabled = false;
+            btnSubmit.textContent = 'Создать задачи';
+            showError('Ошибка отправки: ' + err.message);
+        });
+    });
+})();
+</script>
+{% endblock %}

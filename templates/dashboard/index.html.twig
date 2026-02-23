@@ -1,0 +1,223 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Дашборд — Админ-панель{% endblock %}
+
+{% block styles %}
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.stat-card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; }
+.stat-value { font-size: 32px; font-weight: 700; line-height: 1.2; }
+.stat-label { font-size: 13px; color: #6b7280; margin-top: 4px; }
+.stat-sub { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+.color-blue { color: #2563eb; }
+.color-green { color: #16a34a; }
+.color-purple { color: #8b5cf6; }
+.color-amber { color: #f59e0b; }
+.color-red { color: #dc2626; }
+.color-gray { color: #6b7280; }
+
+.task-status-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+.task-status-bar > div { height: 100%; }
+.task-status-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: #555; }
+.task-status-legend span { display: flex; align-items: center; gap: 4px; }
+.task-status-legend .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.rating-bar-row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 4px; }
+.rating-bar-label { width: 20px; text-align: right; color: #6b7280; }
+.rating-bar-track { flex: 1; height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden; }
+.rating-bar-fill { height: 100%; border-radius: 3px; }
+.rating-bar-count { width: 36px; text-align: right; color: #9ca3af; font-size: 12px; }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+{% endblock %}
+
+{% block content %}
+<h1>Дашборд</h1>
+
+{# === Счётчики === #}
+{% set totalTasks = 0 %}
+{% for s, c in tasksByStatus %}{% set totalTasks = totalTasks + c %}{% endfor %}
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value color-blue">{{ totalTasks }}</div>
+        <div class="stat-label">Задач всего</div>
+        {% if tasksByStatus.running is defined and tasksByStatus.running > 0 %}
+            <div class="stat-sub">{{ tasksByStatus.running }} выполняется сейчас</div>
+        {% endif %}
+    </div>
+    <div class="stat-card">
+        <div class="stat-value color-green">{{ productStats.total }}</div>
+        <div class="stat-label">Товаров</div>
+        {% if productStats.avgPrice %}
+            <div class="stat-sub">~{{ productStats.avgPrice|number_format(0, ',', ' ') }} ₽ средняя цена</div>
+        {% endif %}
+    </div>
+    <div class="stat-card">
+        <div class="stat-value color-purple">{{ reviewStats.total }}</div>
+        <div class="stat-label">Отзывов</div>
+        {% if reviewStats.avgRating %}
+            <div class="stat-sub">{{ reviewStats.avgRating }} средний рейтинг</div>
+        {% endif %}
+    </div>
+    <div class="stat-card">
+        <div class="stat-value color-amber">{{ categoryCount }}</div>
+        <div class="stat-label">Категорий</div>
+    </div>
+</div>
+
+{# === Статусы задач + Типы задач === #}
+<div class="two-col">
+    <div class="card">
+        <h3 style="margin-bottom: 12px;">Статусы задач</h3>
+
+        {% if totalTasks > 0 %}
+            {% set statusColors = {
+                'completed_success': '#16a34a',
+                'completed_empty': '#a3a3a3',
+                'completed_partial': '#f59e0b',
+                'running': '#3b82f6',
+                'pending': '#93c5fd',
+                'paused': '#c084fc',
+                'failed': '#ef4444',
+                'cancelled': '#9ca3af',
+            } %}
+            {% set statusLabels = {
+                'completed_success': 'Выполнено',
+                'completed_empty': 'Нет данных',
+                'completed_partial': 'Частично',
+                'running': 'Выполняется',
+                'pending': 'В очереди',
+                'paused': 'Приостановлено',
+                'failed': 'Ошибка',
+                'cancelled': 'Отменено',
+            } %}
+            <div class="task-status-bar">
+                {% for status, count in tasksByStatus %}
+                    <div style="width: {{ (count / totalTasks * 100)|round(1) }}%; background: {{ statusColors[status] ?? '#d1d5db' }};"></div>
+                {% endfor %}
+            </div>
+            <div class="task-status-legend">
+                {% for status, count in tasksByStatus %}
+                    <span><span class="dot" style="background: {{ statusColors[status] ?? '#d1d5db' }};"></span>{{ statusLabels[status] ?? status }}: {{ count }}</span>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p style="color: #999;">Задач пока нет</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h3 style="margin-bottom: 12px;">Распределение рейтингов отзывов</h3>
+        {% if reviewStats.total > 0 %}
+            {% set maxRatingCount = 1 %}
+            {% for rating, cnt in reviewStats.ratingDistribution %}
+                {% if cnt > maxRatingCount %}{% set maxRatingCount = cnt %}{% endif %}
+            {% endfor %}
+            {% for star in 5..1 %}
+                {% set cnt = reviewStats.ratingDistribution[star] ?? 0 %}
+                <div class="rating-bar-row">
+                    <span class="rating-bar-label">{{ star }}★</span>
+                    <div class="rating-bar-track">
+                        <div class="rating-bar-fill" style="width: {{ (cnt / maxRatingCount * 100)|round(1) }}%; background: {{ star >= 4 ? '#16a34a' : (star == 3 ? '#f59e0b' : '#ef4444') }};"></div>
+                    </div>
+                    <span class="rating-bar-count">{{ cnt }}</span>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p style="color: #999;">Отзывов пока нет</p>
+        {% endif %}
+    </div>
+</div>
+
+{# === Последние задачи + Последние товары === #}
+<div class="two-col">
+    <div class="card">
+        <h3>Последние задачи</h3>
+        {% if recentTasks is empty %}
+            <p style="color: #999; margin-top: 10px;">Нет задач</p>
+        {% else %}
+            {% set statusBadge = {
+                'completed_success': 'success',
+                'completed_empty': 'warning',
+                'completed_partial': 'warning',
+                'failed': 'error',
+                'running': 'info',
+                'pending': 'debug',
+                'paused': 'debug',
+                'cancelled': 'error',
+            } %}
+            {% set statusLabel = {
+                'completed_success': 'Выполнено',
+                'completed_empty': 'Нет данных',
+                'completed_partial': 'Частично',
+                'failed': 'Ошибка',
+                'running': 'Выполняется',
+                'pending': 'В очереди',
+                'paused': 'Приостановлено',
+                'cancelled': 'Отменено',
+            } %}
+            <table>
+                <thead>
+                    <tr>
+                        <th data-sortable>ID</th>
+                        <th data-sortable>Тип</th>
+                        <th data-sortable>Статус</th>
+                        <th data-sortable>Создана</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in recentTasks %}
+                    <tr>
+                        <td><code>{{ task.id|slice(0, 8) }}</code></td>
+                        <td>{{ {search: 'Поиск', product: 'Товар', reviews: 'Отзывы'}[task.type] ?? task.type }}</td>
+                        <td>
+                            <span class="badge badge-{{ statusBadge[task.status] ?? 'debug' }}">
+                                {{ statusLabel[task.status] ?? task.status }}
+                            </span>
+                        </td>
+                        <td data-sort-value="{{ task.createdAt|date('U', 'Europe/Moscow') }}">{{ task.createdAt|date('d.m.Y H:i', 'Europe/Moscow') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+        <p style="margin-top: 10px;"><a href="{{ path('task_list') }}">Все задачи &rarr;</a></p>
+    </div>
+
+    <div class="card">
+        <h3>Последние товары</h3>
+        {% if recentProducts is empty %}
+            <p style="color: #999; margin-top: 10px;">Нет товаров</p>
+        {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th data-sortable>Название</th>
+                        <th data-sortable>Цена</th>
+                        <th data-sortable>Рейтинг</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in recentProducts %}
+                    <tr>
+                        <td><a href="{{ path('product_show', {id: product.id}) }}">{{ product.title|slice(0, 50) }}</a></td>
+                        <td data-sort-value="{{ product.price ?? 0 }}">{{ product.price ? product.price ~ ' ₽' : '—' }}</td>
+                        <td data-sort-value="{{ product.rating ?? 0 }}">{{ product.rating ?? '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+        <p style="margin-top: 10px;"><a href="{{ path('product_list') }}">Все товары &rarr;</a></p>
+    </div>
+</div>
+
+<div class="card">
+    <h3>Быстрые действия</h3>
+    <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <a href="{{ path('task_create') }}" style="padding: 8px 16px; background: #2563eb; color: #fff; border-radius: 4px;">Создать задачу</a>
+        <a href="{{ path('health_dashboard') }}" style="padding: 8px 16px; background: #16a34a; color: #fff; border-radius: 4px;">Проверить здоровье</a>
+        <a href="{{ path('log_list') }}" style="padding: 8px 16px; background: #6b7280; color: #fff; border-radius: 4px;">Логи</a>
+    </div>
+</div>
+{% endblock %}

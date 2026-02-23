@@ -1,0 +1,33 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Категории — Админ-панель{% endblock %}
+
+{% block content %}
+<h1>Категории</h1>
+
+{% if tree is empty %}
+    <div class="card">
+        <p style="color: #999;">Категорий пока нет. Они появятся после парсинга товаров.</p>
+    </div>
+{% else %}
+    <div class="card">
+        {{ _self.renderTree(tree) }}
+    </div>
+{% endif %}
+
+{% macro renderTree(nodes) %}
+    <ul style="list-style: none; padding-left: 20px;">
+        {% for node in nodes %}
+        <li style="padding: 4px 0;">
+            <a href="{{ path('category_show', {id: node.id}) }}">{{ node.name }}</a>
+            {% if node.productCount %}
+                <span style="color: #999; font-size: 12px;">({{ node.productCount }} товаров)</span>
+            {% endif %}
+            {% if node.children is not empty %}
+                {{ _self.renderTree(node.children) }}
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+{% endmacro %}
+{% endblock %}
