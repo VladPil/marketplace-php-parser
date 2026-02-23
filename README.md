@@ -26,10 +26,12 @@ marketplace-php-parser/
 
 | Сервис   | Технологии               | Порт (хост) | Описание                     |
 |----------|--------------------------|-------------|------------------------------|
-| postgres | PostgreSQL 16 + pgvector | 5433        | Основная БД                  |
+| postgres | PostgreSQL 16 + pgvector | 5435        | Основная БД                  |
 | redis    | Redis 7 Alpine           | 6380        | Очереди задач, прогресс, кеш |
 | parser   | PHP 8.4 + Swoole         | 8203        | Движок парсинга (воркеры)    |
 | admin    | PHP 8.4 + Nginx + FPM    | 8202        | Веб-админка (Symfony)        |
+
+Внешняя зависимость — [solver-service](http://193.164.150.12:8204/) для обхода анти-бот защиты Ozon (Playwright).
 
 ## Быстрый старт
 
@@ -37,28 +39,26 @@ marketplace-php-parser/
 
 - Docker и Docker Compose
 - Make
+- Доступ к solver-service (по умолчанию `193.164.150.12:8204`)
 
 ### Запуск
 
 ```bash
-# 1. Скопировать конфигурацию
-cp .docker/env/.env.example .env
+# 1. Создать внешнюю Docker-сеть (один раз)
+docker network create mp-network
 
-# 2. Собрать и запустить
+# 2. Скопировать конфигурацию
+cp .env.example .env
+
+# 3. Собрать и запустить
 make build
 make up
 
-# 3. Дождаться запуска (30-60 секунд на первый раз)
+# 4. Дождаться запуска (30-60 секунд на первый раз)
 make ps
 
-# 4. Применить миграции
+# 5. Применить миграции
 make migrate
-```
-
-Или одной командой:
-
-```bash
-make init
 ```
 
 ### Проверка работоспособности
@@ -72,6 +72,9 @@ curl http://localhost:8202/
 
 # Parser health
 curl http://localhost:8203/
+
+# Solver (внешний)
+curl http://193.164.150.12:8204/health
 ```
 
 ## Админ-панель (localhost:8202)
@@ -103,7 +106,7 @@ curl http://localhost:8203/
 
 ## Прокси
 
-Для работы через прокси-серверы настройте в `.env`:
+В `.env.example` уже настроены рабочие прокси. Для изменения:
 
 ```env
 MP__PROXY__ENABLED=true
@@ -114,13 +117,24 @@ MP__PROXY__LIST=http://user:pass@proxy1:8080,socks5://user:pass@proxy2:1080
 
 ## Solver-service
 
-Парсер может работать с внешним solver-service для обхода анти-бот защиты Ozon. Подключение настраивается в `.env`:
+Парсер использует внешний solver-service для обхода анти-бот защиты Ozon через headless-браузер (Playwright). Текущий экземпляр развёрнут на `193.164.150.12:8204`.
+
+Настройки подключения в `.env`:
 
 ```env
-MP__SOLVER__HOST=host.docker.internal
+MP__SOLVER__HOST=193.164.150.12
 MP__SOLVER__PORT=8204
-MP__SOLVER__REQUEST_TIMEOUT=60
+MP__SOLVER__REQUEST_TIMEOUT=90
 MP__SOLVER__CONNECT_TIMEOUT=10
+```
+
+## Docker-сеть
+
+Проект использует внешнюю Docker-сеть `mp-network`. Это позволяет другим сервисам (например, solver-service) подключаться к той же сети при необходимости.
+
+```bash
+# Создать сеть (один раз, перед первым запуском)
+docker network create mp-network
 ```
 
 ## Makefile команды
@@ -161,7 +175,7 @@ make clean-all      # Удаление всех контейнеров и дан
 
 ## Конфигурация
 
-Вся конфигурация через переменные окружения в `.env` (см. `.docker/env/.env.example`):
+Вся конфигурация через переменные окружения в `.env` (см. `.env.example`):
 
 | Группа              | Описание             |
 |---------------------|----------------------|

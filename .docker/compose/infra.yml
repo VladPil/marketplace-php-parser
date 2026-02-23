@@ -1,5 +1,6 @@
 # infra.yml — Только инфраструктура
-# Использование: docker compose -f php-parser/.docker/compose/infra.yml --env-file .env up -d
+# Использование: docker compose -f .docker/compose/infra.yml --env-file .env up -d
+# Требуется: docker network create mp-network
 #
 # Запускает только инфраструктуру для локальной разработки.
 # Parser и Admin запускаются отдельно на хосте.
@@ -63,4 +64,4 @@ volumes:
 networks:
   mp-network:
     name: mp-network
-    driver: bridge
+    external: true

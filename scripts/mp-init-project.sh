@@ -6,9 +6,17 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo "=== Парсер маркетплейсов — Инициализация проекта ==="
 
+# Создание Docker-сети если не существует
+if ! docker network inspect mp-network &>/dev/null; then
+    docker network create mp-network
+    echo "✓ Создана Docker-сеть mp-network"
+else
+    echo "· Docker-сеть mp-network уже существует"
+fi
+
 # Копирование .env если не существует
 if [ ! -f "$PROJECT_DIR/.env" ]; then
-    cp "$PROJECT_DIR/.docker/env/.env.example" "$PROJECT_DIR/.env"
+    cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
     echo "✓ Создан .env из .env.example"
 else
     echo "· .env уже существует"
@@ -38,5 +46,5 @@ echo ""
 echo "=== Проект готов! ==="
 echo "Admin:  http://localhost:${MP__DOCKER__ADMIN_PORT:-8202}"
 echo "Parser: http://localhost:${MP__DOCKER__PARSER_HEALTH_PORT:-8203}"
-echo "DB:     psql -h localhost -p ${MP__DOCKER__DB_PORT:-5433} -U ${MP__DB__USER:-mp} -d ${MP__DB__NAME:-mp_parser}"
+echo "DB:     psql -h localhost -p ${MP__DOCKER__DB_PORT:-5435} -U ${MP__DB__USER:-mp} -d ${MP__DB__NAME:-mp_parser}"
 echo "Redis:  redis-cli -p ${MP__DOCKER__REDIS_PORT:-6380}"

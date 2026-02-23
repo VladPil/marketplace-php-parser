@@ -1,5 +1,6 @@
 # local.yml — Полное локальное окружение
-# Использование: docker compose -f php-parser/.docker/compose/local.yml --env-file .env up -d
+# Использование: docker compose -f .docker/compose/local.yml --env-file .env up -d
+# Требуется: docker network create mp-network
 #
 # Включает:
 # - PostgreSQL 16 + pgvector
@@ -148,5 +149,5 @@ volumes:
 
 networks:
   mp-network:
-    name: mp-network-local
-    driver: bridge
+    name: mp-network
+    external: true
