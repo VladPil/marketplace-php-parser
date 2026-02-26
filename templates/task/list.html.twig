@@ -383,6 +383,9 @@
     }
 
     function bindCheckboxes() {
+        // Переполучаем selectAll — после замены innerHTML старый элемент теряется
+        selectAllCb = document.getElementById('selectAll');
+
         // Чекбоксы строк
         document.querySelectorAll('.row-checkbox').forEach(function(cb) {
             cb.addEventListener('change', function() {
@@ -405,7 +408,7 @@
             });
         });
 
-        // «Выбрать все»
+        // «Выбрать все» — выделяет все чекбоксы строк и батчей
         if (selectAllCb) {
             selectAllCb.addEventListener('change', function() {
                 var checked = selectAllCb.checked;
@@ -610,7 +613,7 @@
                     html += '<img class="result-image" src="' + escapeHtml(p.imageUrl) + '" alt="" onerror="this.style.display=\'none\'">';
                 }
                 html += '<div style="flex:1">';
-                html += '<div class="result-title">' + escapeHtml(p.title) + '</div>';
+                html += '<div class="result-title"><a href="/products/' + encodeURIComponent(p.id) + '" onclick="event.stopPropagation();">' + escapeHtml(p.title) + '</a></div>';
                 html += '<div class="result-meta">';
                 if (p.price) {
                     html += '<span class="result-price">' + escapeHtml(p.price) + ' \u20bd';
@@ -632,12 +635,27 @@
                 html += '</div>';
 
                 if (p.characteristics && Object.keys(p.characteristics).length) {
-                    html += '<details class="result-chars"><summary>Характеристики (' + Object.keys(p.characteristics).length + ')</summary>';
+                    var totalProps = 0;
+                    Object.keys(p.characteristics).forEach(function(gk) {
+                        var gv = p.characteristics[gk];
+                        totalProps += (gv && typeof gv === 'object' && !Array.isArray(gv)) ? Object.keys(gv).length : 1;
+                    });
+                    html += '<details class="result-chars"><summary>Характеристики (' + totalProps + ')</summary>';
                     html += '<table class="result-chars-table">';
-                    Object.keys(p.characteristics).forEach(function(key) {
-                        var val = p.characteristics[key];
-                        if (Array.isArray(val)) val = val.join(', ');
-                        html += '<tr><td>' + escapeHtml(key) + '</td><td>' + escapeHtml(String(val)) + '</td></tr>';
+                    Object.keys(p.characteristics).forEach(function(groupName) {
+                        var groupVal = p.characteristics[groupName];
+                        if (groupVal && typeof groupVal === 'object' && !Array.isArray(groupVal)) {
+                            html += '<tr><td colspan="2" style="font-weight:600; color:#374151; padding:8px 8px 4px; background:#f8fafc;">' + escapeHtml(groupName) + '</td></tr>';
+                            Object.keys(groupVal).forEach(function(propKey) {
+                                var propVal = groupVal[propKey];
+                                if (Array.isArray(propVal)) propVal = propVal.join(', ');
+                                else if (propVal && typeof propVal === 'object') propVal = JSON.stringify(propVal);
+                                html += '<tr><td>' + escapeHtml(propKey) + '</td><td>' + escapeHtml(String(propVal)) + '</td></tr>';
+                            });
+                        } else {
+                            if (Array.isArray(groupVal)) groupVal = groupVal.join(', ');
+                            html += '<tr><td>' + escapeHtml(groupName) + '</td><td>' + escapeHtml(String(groupVal)) + '</td></tr>';
+                        }
                     });
                     html += '</table></details>';
                 }
@@ -672,6 +690,15 @@
                 }
                 if (r.cons) {
                     html += '<div class="review-cons">\u2796 ' + escapeHtml(r.cons) + '</div>';
+                }
+                if (r.imageUrls && r.imageUrls.length) {
+                    html += '<div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">';
+                    r.imageUrls.forEach(function(url) {
+                        html += '<a href="' + escapeHtml(url) + '" target="_blank" onclick="event.stopPropagation();">';
+                        html += '<img src="' + escapeHtml(url) + '" style="width: 64px; height: 64px; object-fit: cover; border-radius: 4px; border: 1px solid #e5e7eb;" onerror="this.style.display=\'none\'">';
+                        html += '</a>';
+                    });
+                    html += '</div>';
                 }
                 if (r.firstReply) {
                     html += '<div class="review-reply">\ud83d\udcac Ответ продавца: ' + escapeHtml(r.firstReply) + '</div>';

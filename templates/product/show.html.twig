@@ -100,6 +100,7 @@
                     <th>Автор</th>
                     <th>Рейтинг</th>
                     <th>Текст</th>
+                    <th>Фото</th>
                     <th>Дата</th>
                 </tr>
             </thead>
@@ -109,6 +110,17 @@
                     <td>{{ review.author ?? 'Аноним' }}</td>
                     <td>{% for i in 1..5 %}{{ i <= review.rating ? '★' : '☆' }}{% endfor %}</td>
                     <td>{{ review.text ? review.text|slice(0, 100) ~ (review.text|length > 100 ? '...' : '') : '—' }}</td>
+                    <td>
+                        {% if review.imageUrls is not empty %}
+                            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                            {% for url in review.imageUrls %}
+                                <a href="{{ url }}" target="_blank"><img src="{{ url }}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 3px; border: 1px solid #e5e7eb;" loading="lazy"></a>
+                            {% endfor %}
+                            </div>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
                     <td>{{ review.reviewDate ? review.reviewDate|date('d.m.Y', 'Europe/Moscow') : '—' }}</td>
                 </tr>
                 {% endfor %}
