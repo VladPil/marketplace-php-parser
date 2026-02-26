@@ -279,7 +279,7 @@
     });
 
     // ─── Переключатель видимости колонок ───
-    var STORAGE_KEY = 'proxy_col_visibility';
+    var STORAGE_PREFIX = 'proxy_col_';
 
     // Человекочитаемые названия колонок
     var COL_LABELS = {
@@ -292,15 +292,15 @@
     // Колонки, которые нельзя скрыть
     var ALWAYS_VISIBLE = { address: true, actions: true };
 
-    function loadState() {
+    function loadState(tableKey) {
         try {
-            var raw = localStorage.getItem(STORAGE_KEY);
-            return raw ? JSON.parse(raw) : null;
-        } catch(e) { return null; }
+            var raw = localStorage.getItem(STORAGE_PREFIX + tableKey);
+            return raw ? JSON.parse(raw) : {};
+        } catch(e) { return {}; }
     }
 
-    function saveState(state) {
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+    function saveState(tableKey, state) {
+        try { localStorage.setItem(STORAGE_PREFIX + tableKey, JSON.stringify(state)); } catch(e) {}
     }
 
     function applyVisibility(tableId, state) {
@@ -309,20 +309,16 @@
         var cells = table.querySelectorAll('th[data-col], td[data-col]');
         cells.forEach(function(cell) {
             var col = cell.getAttribute('data-col');
-            if (state[col] === false) {
-                cell.style.display = 'none';
-            } else {
-                cell.style.display = '';
-            }
+            cell.style.display = state[col] === false ? 'none' : '';
         });
     }
 
-    function buildPanel(panelId, tableId, state) {
+    function initTable(panelId, tableId, tableKey) {
         var panel = document.getElementById(panelId);
         var table = document.getElementById(tableId);
         if (!panel || !table) return;
 
-        // Собираем колонки из заголовков этой таблицы
+        var state = loadState(tableKey);
         var headers = table.querySelectorAll('thead th[data-col]');
         panel.innerHTML = '';
 
@@ -335,18 +331,19 @@
             cb.type = 'checkbox';
             cb.checked = state[col] !== false;
             cb.setAttribute('data-col', col);
-            cb.setAttribute('data-table', tableId);
 
             cb.addEventListener('change', function() {
                 state[this.getAttribute('data-col')] = this.checked;
-                saveState(state);
-                applyVisibility(this.getAttribute('data-table'), state);
+                saveState(tableKey, state);
+                applyVisibility(tableId, state);
             });
 
             label.appendChild(cb);
             label.appendChild(document.createTextNode(' ' + (COL_LABELS[col] || col)));
             panel.appendChild(label);
         });
+
+        applyVisibility(tableId, state);
     }
 
     // Кнопки открытия/закрытия панелей
@@ -357,12 +354,9 @@
         });
     });
 
-    // Инициализация
-    var state = loadState() || {};
-    buildPanel('col-panel-env', 'table-env', state);
-    buildPanel('col-panel-admin', 'table-admin', state);
-    applyVisibility('table-env', state);
-    applyVisibility('table-admin', state);
+    // Инициализация — раздельный стейт для каждой таблицы
+    initTable('col-panel-env', 'table-env', 'env');
+    initTable('col-panel-admin', 'table-admin', 'admin');
 })();
 </script>
 {% endblock %}
