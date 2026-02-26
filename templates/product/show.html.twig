@@ -1,0 +1,135 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ product.title|slice(0, 50) }} — Админ-панель{% endblock %}
+
+{% block styles %}
+.gallery { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.gallery img { width: 120px; height: 120px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 1px solid #eee; transition: transform 0.2s; }
+.gallery img:hover { transform: scale(1.05); }
+{% endblock %}
+
+{% block content %}
+<a href="{{ path('product_list') }}" class="back-link">&larr; К списку товаров</a>
+
+<h1>{{ product.title }}</h1>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+    <div class="card">
+        <h3>Основная информация</h3>
+        <table>
+            <tr><th>External ID</th><td>{{ product.externalId }}</td></tr>
+            <tr><th>Маркетплейс</th><td>{{ product.marketplace }}</td></tr>
+            <tr><th>Категория</th><td>{{ product.category ? product.category.name : '—' }}</td></tr>
+            <tr><th>Цена</th><td>{{ product.price ? product.price ~ ' ₽' : '—' }}</td></tr>
+            {% if product.originalPrice %}
+                <tr><th>Старая цена</th><td>{{ product.originalPrice }} ₽</td></tr>
+            {% endif %}
+            <tr><th>Рейтинг</th><td>{{ product.rating ?? '—' }}</td></tr>
+            <tr><th>Кол-во отзывов</th><td>{{ product.reviewCount ?? 0 }}</td></tr>
+            {% if product.url %}
+                <tr><th>URL</th><td><a href="{{ product.url }}" target="_blank">Открыть на маркетплейсе</a></td></tr>
+            {% endif %}
+        </table>
+    </div>
+
+    {% set allImages = [] %}
+    {% for img in images %}
+        {% set allImages = allImages|merge([img.url]) %}
+    {% endfor %}
+    {% if product.imageUrls is not empty %}
+        {% for url in product.imageUrls %}
+            {% if url not in allImages %}
+                {% set allImages = allImages|merge([url]) %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+    {% if product.imageUrl and product.imageUrl not in allImages %}
+        {% set allImages = [product.imageUrl]|merge(allImages) %}
+    {% endif %}
+
+    {% if allImages is not empty %}
+    <div class="card">
+        <h3>Изображения ({{ allImages|length }})</h3>
+        <div class="gallery">
+            {% for url in allImages %}
+                <img src="{{ url }}" alt="{{ product.title }}" loading="lazy">
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% if product.characteristics is not empty %}
+<div class="card" style="margin-bottom: 20px;">
+    <h3>Характеристики</h3>
+    {% for group, items in product.characteristics %}
+        {% if items is iterable %}
+            <h4 style="margin: 12px 0 6px; font-size: 14px; color: #555;">{{ group }}</h4>
+            <table style="margin-bottom: 8px;">
+                {% for key, value in items %}
+                    <tr><th>{{ key }}</th><td>{{ value }}</td></tr>
+                {% endfor %}
+            </table>
+        {% else %}
+            <table><tr><th>{{ group }}</th><td>{{ items }}</td></tr></table>
+        {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if product.parseTaskId %}
+<div class="task-logs-card" id="product-task-logs">
+    <div class="card">
+        <div class="card-header" onclick="toggleTaskLogs('product-task-logs', '{{ product.parseTaskId }}')">
+            <h3>Логи задачи</h3>
+            <button class="task-logs-toggle">Показать</button>
+        </div>
+        <div class="task-logs-body" style="display: none;"></div>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <h3>Отзывы ({{ reviews|length }})</h3>
+    {% if reviews is empty %}
+        <p style="color: #999; margin-top: 10px;">Отзывов нет</p>
+    {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Автор</th>
+                    <th>Рейтинг</th>
+                    <th>Текст</th>
+                    <th>Дата</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for review in reviews %}
+                <tr>
+                    <td>{{ review.author ?? 'Аноним' }}</td>
+                    <td>{% for i in 1..5 %}{{ i <= review.rating ? '★' : '☆' }}{% endfor %}</td>
+                    <td>{{ review.text ? review.text|slice(0, 100) ~ (review.text|length > 100 ? '...' : '') : '—' }}</td>
+                    <td>{{ review.reviewDate ? review.reviewDate|date('d.m.Y', 'Europe/Moscow') : '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleTaskLogs(containerId, taskId) {
+    var container = document.getElementById(containerId);
+    var body = container.querySelector('.task-logs-body');
+    var btn = container.querySelector('.task-logs-toggle');
+    var visible = body.style.display !== 'none';
+    body.style.display = visible ? 'none' : 'block';
+    btn.textContent = visible ? 'Показать' : 'Скрыть';
+    if (!visible) {
+        window.loadTaskLogs(taskId, containerId);
+    }
+}
+</script>
+{% endblock %}

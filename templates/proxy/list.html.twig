@@ -1,0 +1,226 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Прокси{% endblock %}
+
+{% block styles %}
+.stat-cards { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.stat-card { flex: 1; min-width: 140px; background: #fff; border-radius: 6px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; }
+.stat-card .stat-value { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+.stat-card .stat-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+.health-bar { width: 60px; height: 8px; background: #e5e7eb; border-radius: 4px; display: inline-block; vertical-align: middle; overflow: hidden; }
+.health-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+.health-score { font-size: 12px; font-weight: 600; margin-left: 6px; vertical-align: middle; }
+.cb-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.cb-closed { background: #dcfce7; color: #166534; }
+.cb-open { background: #fee2e2; color: #991b1b; }
+.cb-half_open { background: #fef3c7; color: #92400e; }
+.cb-unknown { background: #e5e7eb; color: #6b7280; }
+.sessions-info { font-size: 12px; white-space: nowrap; }
+.sessions-info .s-ok { color: #16a34a; font-weight: 600; }
+.sessions-info .s-err { color: #dc2626; font-weight: 600; }
+.sticky-count { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #ede9fe; color: #7c3aed; }
+.proxy-table th, .proxy-table td { vertical-align: middle; }
+.last-used-time { font-size: 12px; color: #888; white-space: nowrap; }
+{% endblock %}
+
+{% block content %}
+<h1>Прокси-серверы</h1>
+
+{# --- Сводная статистика --- #}
+<div class="stat-cards">
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.summary.total }}</div>
+        <div class="stat-label">Всего прокси</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color: #16a34a;">{{ stats.summary.healthy }}</div>
+        <div class="stat-label">Здоровых</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color: {{ stats.summary.cbOpen > 0 ? '#dc2626' : '#16a34a' }};">{{ stats.summary.cbOpen }}</div>
+        <div class="stat-label">CB заблокировано</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color: #7c3aed;">{{ stats.summary.stickyTotal }}</div>
+        <div class="stat-label">Sticky-сессий</div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+    <h3 style="margin-bottom: 12px;">Добавить прокси</h3>
+    <form method="post" action="{{ path('proxy_add') }}">
+        <textarea name="proxies" rows="4" placeholder="http://user:pass@host:port&#10;socks5://user:pass@host:port&#10;&#10;Или через запятую: http://u:p@host:port,http://u:p@host2:port" style="width: 100%; padding: 8px; font-family: monospace; font-size: 13px; border: 1px solid #ddd; border-radius: 4px; resize: vertical;"></textarea>
+        <div style="margin-top: 8px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <label style="font-size: 13px; display: flex; align-items: center; gap: 4px;">
+                <input type="radio" name="type" value="static" checked> Статический
+            </label>
+            <label style="font-size: 13px; display: flex; align-items: center; gap: 4px;">
+                <input type="radio" name="type" value="rotating"> Ротационный
+            </label>
+            <button type="submit" style="padding: 8px 20px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Добавить</button>
+            <span style="font-size: 12px; color: #888;">По одному адресу на строку или через запятую (как в .env)</span>
+        </div>
+    </form>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+        <span class="indicator {{ proxyEnabled ? 'indicator-green' : 'indicator-red' }}"></span>
+        <strong>Ротация прокси: {{ proxyEnabled ? 'включена' : 'отключена' }}</strong>
+        <span style="color: #888; font-size: 13px;">(env: MP__PROXY__ENABLED)</span>
+    </div>
+</div>
+
+{# --- Макрос для отрисовки колонок статистики --- #}
+{% macro proxyStatsRow(s) %}
+    <td>
+        {% if s.type|default('static') == 'rotating' %}
+            <span style="color: #aaa;" title="Health не применим для ротационных прокси">—</span>
+        {% else %}
+            {% set healthPct = (s.health * 100)|round %}
+            {% if s.health >= 0.7 %}
+                {% set hColor = '#16a34a' %}
+            {% elseif s.health >= 0.3 %}
+                {% set hColor = '#f59e0b' %}
+            {% else %}
+                {% set hColor = '#dc2626' %}
+            {% endif %}
+            <div class="health-bar"><div class="health-bar-fill" style="width: {{ healthPct }}%; background: {{ hColor }};"></div></div>
+            <span class="health-score" style="color: {{ hColor }};">{{ s.health }}</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if s.type|default('static') == 'rotating' %}
+            <span style="color: #aaa;" title="Circuit breaker не применим для ротационных прокси">—</span>
+        {% else %}
+            <span class="cb-badge cb-{{ s.cbState }}" title="{% if s.cbState == 'closed' %}Цепь замкнута — запросы проходят, прокси работает нормально{% elseif s.cbState == 'open' %}Цепь разорвана — прокси заблокирован после ≥3 ошибок (на 30 сек){% elseif s.cbState == 'half_open' %}Пробный режим — пропускает один запрос для проверки{% endif %}">
+                {% if s.cbState == 'closed' %}работает
+                {% elseif s.cbState == 'open' %}заблокирован
+                {% elseif s.cbState == 'half_open' %}проверка
+                {% else %}—{% endif %}
+            </span>
+            {% if s.cbFailures > 0 %}
+                <span style="font-size: 11px; color: #dc2626; margin-left: 4px;" title="Ошибки circuit breaker">{{ s.cbFailures }} ош.</span>
+            {% endif %}
+        {% endif %}
+    </td>
+    <td>
+        <span class="sessions-info">
+            <span title="Всего">{{ s.solverTotal }}</span>
+            {% if s.solverTotal > 0 %}
+                (<span class="s-ok" title="Успешных">{{ s.solverSuccess }}</span>/<span class="s-err" title="Ошибок">{{ s.solverError }}</span>)
+            {% endif %}
+        </span>
+    </td>
+    <td>
+        {% if s.stickySessions > 0 %}
+            <span class="sticky-count">{{ s.stickySessions }}</span>
+        {% else %}
+            <span style="color: #ccc;">—</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if s.lastUsed %}
+            <span class="last-used-time">{{ s.lastUsed|date('d.m.Y H:i') }}</span>
+        {% else %}
+            <span style="color: #ccc;">—</span>
+        {% endif %}
+    </td>
+{% endmacro %}
+
+{% if envProxies is not empty %}
+<div class="card" style="margin-bottom: 20px;">
+    <h3 style="margin-bottom: 12px;">ENV-прокси ({{ envProxies|length }})</h3>
+    <div style="overflow-x: auto;">
+    <table class="proxy-table">
+        <thead>
+            <tr>
+                <th>Адрес</th>
+                <th>Источник</th>
+                <th>Тип</th>
+                <th data-sortable>Health</th>
+                <th data-sortable>Circuit Breaker</th>
+                <th data-sortable>Solver-сессии</th>
+                <th data-sortable>Sticky</th>
+                <th data-sortable>Посл. использование</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for proxy in envProxies %}
+            {% set s = stats.perProxy[proxy.proxyId] | default({type: 'static', health: 1.0, cbState: 'unknown', cbFailures: 0, stickySessions: 0, solverTotal: 0, solverSuccess: 0, solverError: 0, lastUsed: null}) %}
+            <tr>
+                <td style="font-family: monospace; font-size: 13px;">{{ proxy.address }}</td>
+                <td><span class="badge badge-info">env</span></td>
+                <td><span style="font-size: 12px;">статический</span></td>
+                {{ _self.proxyStatsRow(s) }}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <h3 style="margin-bottom: 12px;">Прокси из админки ({{ adminProxies|length }})</h3>
+    {% if adminProxies is empty %}
+        <p style="color: #888;">Нет добавленных прокси</p>
+    {% else %}
+    <div style="overflow-x: auto;">
+    <table class="proxy-table">
+        <thead>
+            <tr>
+                <th>Адрес</th>
+                <th>Источник</th>
+                <th>Тип</th>
+                <th>Статус</th>
+                <th data-sortable>Health</th>
+                <th data-sortable>Circuit Breaker</th>
+                <th data-sortable>Solver-сессии</th>
+                <th data-sortable>Sticky</th>
+                <th data-sortable>Посл. использование</th>
+                <th>Добавлен</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for proxy in adminProxies %}
+            {% set pid = adminProxyIds[proxy.id] | default('') %}
+            {% set s = stats.perProxy[pid] | default({type: proxy.type|default('static'), health: 1.0, cbState: 'unknown', cbFailures: 0, stickySessions: 0, solverTotal: 0, solverSuccess: 0, solverError: 0, lastUsed: null}) %}
+            <tr style="{{ not proxy.enabled ? 'opacity: 0.5;' : '' }}">
+                <td style="font-family: monospace; font-size: 13px;">{{ proxy.address }}</td>
+                <td><span class="badge" style="background: #8b5cf6;">admin</span></td>
+                <td>
+                    {% if proxy.type == 'rotating' %}
+                        <span style="font-size: 12px; color: #7c3aed;">ротационный</span>
+                    {% else %}
+                        <span style="font-size: 12px;">статический</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if proxy.enabled %}
+                        <span class="badge badge-success">активен</span>
+                    {% else %}
+                        <span class="badge badge-error">отключён</span>
+                    {% endif %}
+                </td>
+                {{ _self.proxyStatsRow(s) }}
+                <td>{{ proxy.createdAt|date('d.m.Y H:i') }}</td>
+                <td style="display: flex; gap: 6px;">
+                    <form method="post" action="{{ path('proxy_toggle', {id: proxy.id}) }}" style="display: inline;">
+                        <button type="submit" style="padding: 4px 10px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 12px; background: {{ proxy.enabled ? '#fee2e2' : '#dcfce7' }}; color: {{ proxy.enabled ? '#991b1b' : '#166534' }};">
+                            {{ proxy.enabled ? 'Отключить' : 'Включить' }}
+                        </button>
+                    </form>
+                    <form method="post" action="{{ path('proxy_delete', {id: proxy.id}) }}" style="display: inline;" onsubmit="return confirm('Удалить прокси?')">
+                        <button type="submit" style="padding: 4px 10px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 12px; background: #f5f5f5; color: #666;">Удалить</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

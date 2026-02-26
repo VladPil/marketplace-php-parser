@@ -1,0 +1,56 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Логи парсинга{% endblock %}
+
+{% block content %}
+    <h1>Логи парсинга</h1>
+
+    <div class="filters">
+        <a href="{{ path('log_list') }}" class="{{ currentLevel is null ? 'active' : '' }}">Все</a>
+        <a href="{{ path('log_list', {level: 'debug'}) }}" class="{{ currentLevel == 'debug' ? 'active' : '' }}">Debug</a>
+        <a href="{{ path('log_list', {level: 'info'}) }}" class="{{ currentLevel == 'info' ? 'active' : '' }}">Info</a>
+        <a href="{{ path('log_list', {level: 'warning'}) }}" class="{{ currentLevel == 'warning' ? 'active' : '' }}">Warning</a>
+        <a href="{{ path('log_list', {level: 'error'}) }}" class="{{ currentLevel == 'error' ? 'active' : '' }}">Error</a>
+    </div>
+
+    {% if logs is empty %}
+        <div class="card">Логи не найдены.</div>
+    {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Время</th>
+                    <th>Уровень</th>
+                    <th>Канал</th>
+                    <th>Trace ID</th>
+                    <th>Задача</th>
+                    <th>Сообщение</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                    <tr>
+                        <td>{{ log.createdAt|date('d.m.Y H:i:s', 'Europe/Moscow') }}</td>
+                        <td><span class="badge badge-{{ log.level }}">{{ log.level }}</span></td>
+                        <td>{{ log.channel }}</td>
+                        <td>
+                            <a href="{{ path('log_by_trace', {traceId: log.traceId}) }}">
+                                {{ log.traceId|slice(0, 8) }}...
+                            </a>
+                        </td>
+                        <td>
+                            {% if log.parseTaskId %}
+                                <a href="{{ path('log_by_task', {taskId: log.parseTaskId}) }}">
+                                    {{ log.parseTaskId|slice(0, 8) }}...
+                                </a>
+                            {% else %}
+                                <span style="color: #999;">&mdash;</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.message|length > 120 ? log.message|slice(0, 120) ~ '...' : log.message }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endblock %}

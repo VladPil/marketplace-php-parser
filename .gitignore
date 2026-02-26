@@ -1,0 +1,24 @@
+# Зависимости
+/vendor/
+
+# Symfony
+/var/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*~
+
+# PHPUnit / PHPStan
+.phpunit.result.cache
+phpstan-baseline.neon
+
+# Локальная конфигурация (может содержать credentials)
+.docker/compose/.env
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store

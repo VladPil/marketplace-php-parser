@@ -1,0 +1,74 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ category.name }} — Админ-панель{% endblock %}
+
+{% block content %}
+<a href="{{ path('category_list') }}" class="back-link">&larr; К списку категорий</a>
+
+<h1>{{ category.name }}</h1>
+
+<div class="card" style="margin-bottom: 20px;">
+    <table>
+        <tr><th>External ID</th><td>{{ category.externalId }}</td></tr>
+        <tr><th>Путь</th><td>{{ category.path ?? '—' }}</td></tr>
+        <tr><th>Глубина</th><td>{{ category.depth }}</td></tr>
+        <tr><th>Кол-во товаров</th><td>{{ category.productCount ?? 0 }}</td></tr>
+    </table>
+</div>
+
+{% if category.parseTaskId %}
+<div class="task-logs-card" id="category-task-logs">
+    <div class="card">
+        <div class="card-header" onclick="toggleTaskLogs('category-task-logs', '{{ category.parseTaskId }}')">
+            <h3>Логи задачи</h3>
+            <button class="task-logs-toggle">Показать</button>
+        </div>
+        <div class="task-logs-body" style="display: none;"></div>
+    </div>
+</div>
+{% endif %}
+
+<h2>Товары в категории</h2>
+{% if products is empty %}
+    <div class="card">
+        <p style="color: #999;">Товаров в этой категории нет</p>
+    </div>
+{% else %}
+    <table>
+        <thead>
+            <tr>
+                <th>Название</th>
+                <th>Цена</th>
+                <th>Рейтинг</th>
+                <th>Отзывы</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in products %}
+            <tr>
+                <td><a href="{{ path('product_show', {id: product.id}) }}">{{ product.title|slice(0, 60) }}</a></td>
+                <td>{{ product.price ? product.price ~ ' ₽' : '—' }}</td>
+                <td>{{ product.rating ?? '—' }}</td>
+                <td>{{ product.reviewCount ?? 0 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleTaskLogs(containerId, taskId) {
+    var container = document.getElementById(containerId);
+    var body = container.querySelector('.task-logs-body');
+    var btn = container.querySelector('.task-logs-toggle');
+    var visible = body.style.display !== 'none';
+    body.style.display = visible ? 'none' : 'block';
+    btn.textContent = visible ? 'Показать' : 'Скрыть';
+    if (!visible) {
+        window.loadTaskLogs(taskId, containerId);
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Отзывы — Админ-панель{% endblock %}
+
+{% block content %}
+<a href="{{ path('product_list') }}" class="back-link">&larr; К товарам</a>
+
+<h1>Отзывы к товару #{{ productId }}</h1>
+
+{% if parseTaskId is defined and parseTaskId %}
+<div class="task-logs-card" id="review-task-logs">
+    <div class="card">
+        <div class="card-header" onclick="toggleTaskLogs('review-task-logs', '{{ parseTaskId }}')">
+            <h3>Логи задачи</h3>
+            <button class="task-logs-toggle">Показать</button>
+        </div>
+        <div class="task-logs-body" style="display: none;"></div>
+    </div>
+</div>
+{% endif %}
+
+{% if reviews is empty %}
+    <div class="card">
+        <p style="color: #999;">Отзывов нет</p>
+    </div>
+{% else %}
+    <table>
+        <thead>
+            <tr>
+                <th data-sortable>Автор</th>
+                <th data-sortable>Рейтинг</th>
+                <th>Текст</th>
+                <th>Плюсы</th>
+                <th>Минусы</th>
+                <th data-sortable>Дата</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for review in reviews %}
+            <tr>
+                <td>{{ review.author ?? 'Аноним' }}</td>
+                <td data-sort-value="{{ review.rating }}">{% for i in 1..5 %}{{ i <= review.rating ? '★' : '☆' }}{% endfor %}</td>
+                <td>{{ review.text ? review.text|slice(0, 150) ~ (review.text|length > 150 ? '...' : '') : '—' }}</td>
+                <td>{{ review.pros ? review.pros|slice(0, 80) : '—' }}</td>
+                <td>{{ review.cons ? review.cons|slice(0, 80) : '—' }}</td>
+                <td data-sort-value="{{ review.reviewDate ? review.reviewDate|date('U', 'Europe/Moscow') : 0 }}">{{ review.reviewDate ? review.reviewDate|date('d.m.Y', 'Europe/Moscow') : '—' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleTaskLogs(containerId, taskId) {
+    var container = document.getElementById(containerId);
+    var body = container.querySelector('.task-logs-body');
+    var btn = container.querySelector('.task-logs-toggle');
+    var visible = body.style.display !== 'none';
+    body.style.display = visible ? 'none' : 'block';
+    btn.textContent = visible ? 'Показать' : 'Скрыть';
+    if (!visible) {
+        window.loadTaskLogs(taskId, containerId);
+    }
+}
+</script>
+{% endblock %}

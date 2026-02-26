@@ -1,0 +1,973 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Задачи — Админ-панель{% endblock %}
+
+{% block styles %}
+    tr[data-task-id] { cursor: pointer; }
+    .log-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+    .log-modal-overlay.active { display: flex; }
+    .log-modal { background: #fff; border-radius: 8px; width: 70%; max-width: 1650px; height: 90vh; display: flex; flex-direction: column; box-shadow: 0 8px 30px rgba(0,0,0,0.2); }
+    .log-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #eee; }
+    .log-modal-header h3 { font-size: 16px; margin: 0; }
+    .log-modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #666; padding: 0 4px; }
+    .log-modal-close:hover { color: #000; }
+    .modal-tabs { display: flex; gap: 0; border-bottom: 2px solid #e5e7eb; padding: 0 20px; }
+    .modal-tab { padding: 10px 20px; cursor: pointer; border: none; background: none; font-size: 14px; color: #6b7280; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.2s, border-color 0.2s; }
+    .modal-tab:hover { color: #374151; }
+    .modal-tab.active { color: #2563eb; border-bottom-color: #2563eb; font-weight: 500; }
+    .log-modal-body { overflow-y: auto; padding: 16px 20px; flex: 1; }
+    .log-entry { padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+    .log-entry .badge { min-width: 55px; text-align: center; box-sizing: border-box; }
+    .log-entry:last-child { border-bottom: none; }
+    .log-time { color: #6b7280; white-space: nowrap; min-width: 75px; }
+    .log-channel { color: #8b5cf6; white-space: nowrap; min-width: 70px; display: inline-block; }
+    .log-message { color: #111; }
+    .log-context-toggle { display: inline-block; margin-top: 4px; padding: 2px 8px; background: #e5e7eb; border-radius: 3px; font-size: 11px; color: #6b7280; cursor: pointer; user-select: none; }
+    .log-context-toggle:hover { background: #d1d5db; color: #374151; }
+    .log-context { width: 100%; margin-top: 4px; padding: 6px 8px; background: #f8f9fa; border-radius: 4px; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; color: #555; display: none; }
+    .log-context.open { display: block; }
+    .log-trace { color: #2563eb; font-size: 11px; font-family: monospace; text-decoration: none; white-space: nowrap; }
+    .log-trace:hover { text-decoration: underline; }
+    .trace-group-header { background: #f1f5f9; padding: 6px 10px; margin: 12px 0 4px; border-radius: 4px; font-size: 12px; font-family: monospace; color: #475569; display: flex; align-items: center; gap: 8px; }
+    .trace-group-header a { color: #2563eb; text-decoration: none; }
+    .trace-group-header a:hover { text-decoration: underline; }
+    .solver-log-entry { padding: 4px 0 4px 20px; font-size: 12px; color: #64748b; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; border-bottom: 1px solid #f8fafc; }
+    .solver-log-entry .log-time { font-size: 11px; }
+    .solver-badge { background: #dbeafe; color: #1e40af; font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 500; }
+    .solver-logs-block { margin: 0 0 8px 0; padding: 6px 0; border-left: 3px solid #93c5fd; }
+    .log-loading { text-align: center; padding: 40px; color: #999; }
+    .log-empty { text-align: center; padding: 40px; color: #999; }
+    .result-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; font-size: 13px; }
+    .result-card:hover { border-color: #c7d2fe; }
+    .result-title { font-size: 15px; font-weight: 600; color: #111; margin-bottom: 8px; }
+    .result-title a { color: #2563eb; }
+    .result-meta { display: flex; gap: 16px; flex-wrap: wrap; color: #6b7280; margin-bottom: 6px; }
+    .result-meta span { display: flex; align-items: center; gap: 4px; }
+    .result-price { font-weight: 600; color: #111; }
+    .result-price-old { text-decoration: line-through; color: #9ca3af; font-size: 12px; margin-left: 6px; }
+    .result-rating { color: #f59e0b; }
+    .result-chars { margin-top: 8px; }
+    .result-chars summary { cursor: pointer; color: #6b7280; font-size: 12px; }
+    .result-chars-table { margin-top: 6px; width: 100%; font-size: 12px; }
+    .result-chars-table td { padding: 3px 8px; border-bottom: 1px solid #f3f4f6; }
+    .result-chars-table td:first-child { color: #6b7280; width: 40%; }
+    .review-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; font-size: 13px; }
+    .review-card:hover { border-color: #c7d2fe; }
+    .review-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .review-author { font-weight: 600; color: #111; }
+    .review-date { color: #9ca3af; font-size: 12px; }
+    .review-stars { color: #f59e0b; margin-bottom: 6px; }
+    .review-text { color: #374151; line-height: 1.5; margin-bottom: 6px; }
+    .review-pros { color: #16a34a; font-size: 12px; margin-bottom: 4px; }
+    .review-cons { color: #dc2626; font-size: 12px; margin-bottom: 4px; }
+    .review-reply { background: #f0f9ff; border-left: 3px solid #3b82f6; padding: 8px 10px; margin-top: 6px; font-size: 12px; color: #374151; border-radius: 0 4px 4px 0; }
+    .result-image { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; margin-right: 12px; flex-shrink: 0; }
+    .result-row { display: flex; align-items: flex-start; }
+    .results-summary { display: flex; gap: 16px; margin-bottom: 16px; }
+    .results-summary .card { flex: 1; text-align: center; padding: 12px; }
+
+    /* Чекбоксы и массовые действия */
+    .task-checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb; }
+    .bulk-bar { display: none; position: sticky; top: 0; z-index: 50; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 16px; margin-bottom: 12px; align-items: center; gap: 12px; }
+    .bulk-bar.visible { display: flex; }
+    .bulk-bar-count { font-weight: 600; color: #1e40af; font-size: 14px; }
+    .bulk-bar-actions { display: flex; gap: 8px; margin-left: auto; }
+    .btn-bulk-delete { padding: 6px 14px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    .btn-bulk-delete:hover { background: #dc2626; }
+    .btn-bulk-deselect { padding: 6px 14px; background: #6b7280; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    .btn-bulk-deselect:hover { background: #4b5563; }
+
+    /* Группировка батчей */
+    .batch-header-row { background: #f8fafc; cursor: pointer; user-select: none; }
+    .batch-header-row:hover { background: #f1f5f9; }
+    .batch-header-row td { padding: 10px 12px; font-weight: 600; font-size: 13px; color: #374151; }
+    .batch-toggle { display: inline-block; transition: transform 0.2s; margin-right: 6px; font-size: 12px; }
+    .batch-toggle.collapsed { transform: rotate(-90deg); }
+    .batch-task-row.hidden { display: none; }
+{% endblock %}
+
+{% block content %}
+<h1>Задачи парсинга</h1>
+
+<div style="margin-bottom: 16px; display: flex; gap: 8px; align-items: center;">
+    <a href="{{ path('task_create') }}" style="padding: 8px 16px; background: #2563eb; color: #fff; border-radius: 4px; display: inline-block;">Создать задачу</a>
+    {% if batchId is defined and batchId %}
+        <a href="{{ path('task_list') }}" style="padding: 8px 16px; background: #6b7280; color: #fff; border-radius: 4px; display: inline-block;">Все задачи</a>
+    {% endif %}
+</div>
+
+{% if batchId is defined and batchId and batchSummary is defined and batchSummary %}
+    <div class="card" style="margin-bottom: 16px; padding: 12px 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+        <strong>Батч {{ batchId|slice(0, 8) }} — {{ batchSummary.total }} {{ batchSummary.total == 1 ? 'задача' : (batchSummary.total >= 2 and batchSummary.total <= 4 ? 'задачи' : 'задач') }}</strong>
+        <span class="badge badge-success">Выполнено: {{ batchSummary.completed_success }}</span>
+        <span class="badge badge-error">Ошибка: {{ batchSummary.failed }}</span>
+        <span class="badge badge-info">Выполняется: {{ batchSummary.running }}</span>
+        <span class="badge badge-debug">В очереди: {{ batchSummary.pending }}</span>
+    </div>
+{% endif %}
+
+{# Панель массовых действий #}
+<div class="bulk-bar" id="bulkBar">
+    <span class="bulk-bar-count" id="bulkCount">Выбрано: 0</span>
+    <div class="bulk-bar-actions">
+        <button class="btn-bulk-deselect" id="bulkDeselect">Снять выделение</button>
+        <button class="btn-bulk-delete" id="bulkDelete">Удалить выбранные</button>
+    </div>
+</div>
+
+<div id="taskTableWrap">
+{% if tasks is empty %}
+    <div class="card">
+        <p style="color: #999;">Задач пока нет. <a href="{{ path('task_create') }}">Создать первую</a></p>
+    </div>
+{% else %}
+    <table id="taskTable">
+        <thead>
+            <tr>
+                <th style="width: 36px;"><input type="checkbox" class="task-checkbox" id="selectAll" title="Выбрать все"></th>
+                <th data-sortable>ID</th>
+                <th data-sortable>Тип</th>
+                <th data-sortable>Маркетплейс</th>
+                <th data-sortable>Батч</th>
+                <th data-sortable>Статус</th>
+                <th>Прогресс</th>
+                <th data-sortable>Создана</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for groupKey, groupTasks in grouped %}
+                {% set isBatch = groupKey[:8] != '_single_' and groupTasks|length > 1 %}
+
+                {% if isBatch %}
+                    {# Заголовок батча — сворачиваемый #}
+                    <tr class="batch-header-row" data-batch-id="{{ groupKey }}">
+                        <td onclick="event.stopPropagation();">
+                            <input type="checkbox" class="task-checkbox batch-checkbox" data-batch-id="{{ groupKey }}" title="Выбрать весь батч">
+                        </td>
+                        <td colspan="8">
+                            <span class="batch-toggle" data-batch-id="{{ groupKey }}">&#9660;</span>
+                            Батч <code>{{ groupKey|slice(0, 8) }}</code> — {{ groupTasks|length }} {{ groupTasks|length == 1 ? 'задача' : (groupTasks|length >= 2 and groupTasks|length <= 4 ? 'задачи' : 'задач') }}
+                            {% set batchStatuses = {} %}
+                            {% for t in groupTasks %}
+                                {% set s = t.status %}
+                                {% set batchStatuses = batchStatuses|merge({(s): (batchStatuses[s] is defined ? batchStatuses[s] + 1 : 1)}) %}
+                            {% endfor %}
+                            {% set statusBadgeMap = {
+                                'completed_success': 'success',
+                                'completed_empty': 'warning',
+                                'completed_skipped': 'skipped',
+                                'completed_partial': 'warning',
+                                'failed': 'error',
+                                'running': 'info',
+                                'pending': 'debug',
+                                'paused': 'debug',
+                                'cancelled': 'error',
+                            } %}
+                            {% set statusLabelMap = {
+                                'completed_success': 'Выполнено',
+                                'completed_empty': 'Нет данных',
+                                'completed_skipped': 'Пропущен',
+                                'completed_partial': 'Частично',
+                                'failed': 'Ошибка',
+                                'running': 'Выполняется',
+                                'pending': 'В очереди',
+                                'paused': 'Приостановлено',
+                                'cancelled': 'Отменено',
+                            } %}
+                            <span style="margin-left: 12px;">
+                                {% for s, cnt in batchStatuses %}
+                                    <span class="badge badge-{{ statusBadgeMap[s] ?? 'debug' }}" style="font-size: 11px;">{{ statusLabelMap[s] ?? s }}: {{ cnt }}</span>
+                                {% endfor %}
+                            </span>
+                        </td>
+                    </tr>
+                {% endif %}
+
+                {% for task in groupTasks %}
+                <tr data-task-id="{{ task.id }}" {% if isBatch %}class="batch-task-row" data-batch-group="{{ groupKey }}"{% endif %}>
+                    <td onclick="event.stopPropagation();">
+                        <input type="checkbox" class="task-checkbox row-checkbox" data-task-id="{{ task.id }}" {% if isBatch %}data-batch-id="{{ groupKey }}"{% endif %}>
+                    </td>
+                    <td><code>{{ task.id|slice(0, 8) }}</code></td>
+                    <td>{{ {search: 'Поиск товаров', product: 'Парсинг товара', reviews: 'Парсинг отзывов'}[task.type] ?? task.type }}</td>
+                    <td>{{ task.marketplace }}</td>
+                    <td>
+                        {% if task.batchId %}
+                            <a href="{{ path('task_list', {batch_id: task.batchId}) }}" title="{{ task.batchId }}" style="color: #2563eb;" onclick="event.stopPropagation();">
+                                <code>{{ task.batchId|slice(0, 8) }}</code>
+                            </a>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% set statusBadge = {
+                            'completed_success': 'success',
+                            'completed_empty': 'warning',
+                            'completed_skipped': 'skipped',
+                            'completed_partial': 'warning',
+                            'failed': 'error',
+                            'running': 'info',
+                            'pending': 'debug',
+                            'paused': 'debug',
+                            'cancelled': 'error',
+                        } %}
+                        {% set statusLabel = {
+                            'completed_success': 'Выполнено',
+                            'completed_empty': 'Нет данных',
+                            'completed_skipped': 'Пропущен',
+                            'completed_partial': 'Частично',
+                            'failed': 'Ошибка',
+                            'running': 'Выполняется',
+                            'pending': 'В очереди',
+                            'paused': 'Приостановлено',
+                            'cancelled': 'Отменено',
+                        } %}
+                        <span class="badge badge-{{ statusBadge[task.status] ?? 'debug' }}" data-status="{{ task.status }}">
+                            {{ statusLabel[task.status] ?? task.status }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if task.totalItems %}
+                            {{ task.parsedItems ?? 0 }} / {{ task.totalItems }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td data-sort-value="{{ task.createdAt|date('U', 'Europe/Moscow') }}">{{ task.createdAt|date('d.m.Y H:i', 'Europe/Moscow') }}</td>
+                    <td>
+                        {% if task.status in ['pending', 'running', 'paused'] %}
+                            <form method="post" action="{{ path('task_cancel', {id: task.id}) }}" style="display: inline;">
+                                <button type="submit" style="padding: 4px 8px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Отменить</button>
+                            </form>
+                        {% endif %}
+                        <form method="post" action="{{ path('task_delete', {id: task.id}) }}" style="display: inline;" onsubmit="return confirm('Удалить задачу и все её логи?')">
+                            <button type="submit" style="padding: 4px 8px; background: #6b7280; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Удалить</button>
+                        </form>
+                        {% if task.errorMessage %}
+                            <span title="{{ task.errorMessage }}" style="cursor: help; color: #ef4444;">&#9888;</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {# Подзадачи родительской задачи #}
+                {% if childTasksMap[task.id] is defined %}
+                    {% for child in childTasksMap[task.id] %}
+                    <tr class="subtask-row" data-task-id="{{ child.id }}" style="background: #f8fafc;">
+                        <td></td>
+                        <td style="padding-left: 24px; color: #6b7280;">
+                            ↳ <code>{{ child.id|slice(0, 8) }}</code>
+                        </td>
+                        <td style="color: #6b7280; font-size: 13px;">{{ {search: 'Поиск товаров', product: 'Парсинг товара', reviews: 'Парсинг отзывов'}[child.type] ?? child.type }}</td>
+                        <td style="color: #6b7280;">{{ child.marketplace }}</td>
+                        <td>—</td>
+                        <td>
+                            {% set statusBadge = {
+                                'completed_success': 'success',
+                                'completed_empty': 'warning',
+                                'completed_skipped': 'skipped',
+                                'completed_partial': 'warning',
+                                'failed': 'error',
+                                'running': 'info',
+                                'pending': 'debug',
+                                'paused': 'debug',
+                                'cancelled': 'error',
+                            } %}
+                            <span class="badge badge-{{ statusBadge[child.status] ?? 'debug' }}" data-status="{{ child.status }}">
+                                {{ {
+                                    'completed_success': 'Выполнено',
+                                    'completed_empty': 'Нет данных',
+                                    'completed_skipped': 'Пропущен',
+                                    'completed_partial': 'Частично',
+                                    'failed': 'Ошибка',
+                                    'running': 'Выполняется',
+                                    'pending': 'В очереди',
+                                    'paused': 'Приостановлено',
+                                    'cancelled': 'Отменено',
+                                }[child.status] ?? child.status }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if child.totalItems %}
+                                {{ child.parsedItems ?? 0 }} / {{ child.totalItems }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td data-sort-value="{{ child.createdAt|date('U', 'Europe/Moscow') }}" style="color: #6b7280;">{{ child.createdAt|date('d.m.Y H:i', 'Europe/Moscow') }}</td>
+                        <td></td>
+                    </tr>
+                    {% endfor %}
+                {% endif %}
+                {% endfor %}
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+</div>
+
+<div class="log-modal-overlay" id="logModal">
+    <div class="log-modal">
+        <div class="log-modal-header">
+            <h3 id="logModalTitle">Задача</h3>
+            <button class="log-modal-close" id="logModalClose">&times;</button>
+        </div>
+        <div class="modal-tabs">
+            <button class="modal-tab active" data-tab="logs">Логи</button>
+            <button class="modal-tab" data-tab="results">Результаты</button>
+        </div>
+        <div class="log-modal-body" id="logModalBody">
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var overlay = document.getElementById('logModal');
+    var body = document.getElementById('logModalBody');
+    var title = document.getElementById('logModalTitle');
+    var closeBtn = document.getElementById('logModalClose');
+    var tabs = document.querySelectorAll('.modal-tab');
+    var currentTaskId = null;
+    var activeTab = 'logs';
+    var refreshTimer = null;
+    var MODAL_REFRESH = 3000;
+    var TABLE_REFRESH = 5000;
+
+    // === Массовые действия ===
+    var bulkBar = document.getElementById('bulkBar');
+    var bulkCount = document.getElementById('bulkCount');
+    var bulkDeleteBtn = document.getElementById('bulkDelete');
+    var bulkDeselectBtn = document.getElementById('bulkDeselect');
+    var selectAllCb = document.getElementById('selectAll');
+
+    // Состояние свёрнутых батчей
+    var collapsedBatches = {};
+
+    function getSelectedIds() {
+        var ids = [];
+        document.querySelectorAll('.row-checkbox:checked').forEach(function(cb) {
+            ids.push(cb.dataset.taskId);
+        });
+        return ids;
+    }
+
+    function updateBulkBar() {
+        var ids = getSelectedIds();
+        if (ids.length > 0) {
+            bulkBar.classList.add('visible');
+            bulkCount.textContent = 'Выбрано: ' + ids.length;
+        } else {
+            bulkBar.classList.remove('visible');
+        }
+        updateSelectAllState();
+    }
+
+    function updateSelectAllState() {
+        if (!selectAllCb) return;
+        var all = document.querySelectorAll('.row-checkbox');
+        var checked = document.querySelectorAll('.row-checkbox:checked');
+        selectAllCb.checked = all.length > 0 && checked.length === all.length;
+        selectAllCb.indeterminate = checked.length > 0 && checked.length < all.length;
+    }
+
+    function updateBatchCheckbox(batchId) {
+        var batchCb = document.querySelector('.batch-checkbox[data-batch-id="' + batchId + '"]');
+        if (!batchCb) return;
+        var rows = document.querySelectorAll('.row-checkbox[data-batch-id="' + batchId + '"]');
+        var checked = document.querySelectorAll('.row-checkbox[data-batch-id="' + batchId + '"]:checked');
+        batchCb.checked = rows.length > 0 && checked.length === rows.length;
+        batchCb.indeterminate = checked.length > 0 && checked.length < rows.length;
+    }
+
+    function bindCheckboxes() {
+        // Чекбоксы строк
+        document.querySelectorAll('.row-checkbox').forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                if (cb.dataset.batchId) {
+                    updateBatchCheckbox(cb.dataset.batchId);
+                }
+                updateBulkBar();
+            });
+        });
+
+        // Чекбоксы батчей — выделяют все задачи батча
+        document.querySelectorAll('.batch-checkbox').forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                var batchId = cb.dataset.batchId;
+                var checked = cb.checked;
+                document.querySelectorAll('.row-checkbox[data-batch-id="' + batchId + '"]').forEach(function(rowCb) {
+                    rowCb.checked = checked;
+                });
+                updateBulkBar();
+            });
+        });
+
+        // «Выбрать все»
+        if (selectAllCb) {
+            selectAllCb.addEventListener('change', function() {
+                var checked = selectAllCb.checked;
+                document.querySelectorAll('.row-checkbox').forEach(function(cb) {
+                    cb.checked = checked;
+                });
+                document.querySelectorAll('.batch-checkbox').forEach(function(cb) {
+                    cb.checked = checked;
+                });
+                updateBulkBar();
+            });
+        }
+    }
+
+    // Сворачивание батчей
+    function bindBatchToggle() {
+        document.querySelectorAll('.batch-header-row').forEach(function(headerRow) {
+            headerRow.addEventListener('click', function(e) {
+                if (e.target.closest('input')) return;
+                var batchId = headerRow.dataset.batchId;
+                toggleBatch(batchId);
+            });
+        });
+        // Восстановить состояние после обновления таблицы
+        Object.keys(collapsedBatches).forEach(function(batchId) {
+            if (collapsedBatches[batchId]) {
+                collapseBatch(batchId);
+            }
+        });
+    }
+
+    function toggleBatch(batchId) {
+        if (collapsedBatches[batchId]) {
+            expandBatch(batchId);
+        } else {
+            collapseBatch(batchId);
+        }
+    }
+
+    function collapseBatch(batchId) {
+        collapsedBatches[batchId] = true;
+        var toggle = document.querySelector('.batch-toggle[data-batch-id="' + batchId + '"]');
+        if (toggle) toggle.classList.add('collapsed');
+        document.querySelectorAll('.batch-task-row[data-batch-group="' + batchId + '"]').forEach(function(row) {
+            row.classList.add('hidden');
+        });
+    }
+
+    function expandBatch(batchId) {
+        collapsedBatches[batchId] = false;
+        var toggle = document.querySelector('.batch-toggle[data-batch-id="' + batchId + '"]');
+        if (toggle) toggle.classList.remove('collapsed');
+        document.querySelectorAll('.batch-task-row[data-batch-group="' + batchId + '"]').forEach(function(row) {
+            row.classList.remove('hidden');
+        });
+    }
+
+    // Массовое удаление
+    if (bulkDeleteBtn) {
+        bulkDeleteBtn.addEventListener('click', function() {
+            var ids = getSelectedIds();
+            if (ids.length === 0) return;
+            if (!confirm('Удалить ' + ids.length + ' задач(и) и все их логи?')) return;
+
+            fetch('/tasks/bulk-delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: ids }),
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.deleted > 0) {
+                    refreshTableRows();
+                    bulkBar.classList.remove('visible');
+                }
+            })
+            .catch(function() {
+                alert('Ошибка при удалении');
+            });
+        });
+    }
+
+    if (bulkDeselectBtn) {
+        bulkDeselectBtn.addEventListener('click', function() {
+            document.querySelectorAll('.row-checkbox:checked, .batch-checkbox:checked').forEach(function(cb) {
+                cb.checked = false;
+            });
+            if (selectAllCb) selectAllCb.checked = false;
+            updateBulkBar();
+        });
+    }
+
+    // === Автообновление ===
+    function startAutoRefresh() {
+        stopAutoRefresh();
+        refreshTimer = setInterval(function() {
+            if (currentTaskId && overlay.classList.contains('active')) {
+                refreshActiveTab();
+            }
+        }, MODAL_REFRESH);
+    }
+
+    function stopAutoRefresh() {
+        if (refreshTimer) {
+            clearInterval(refreshTimer);
+            refreshTimer = null;
+        }
+    }
+
+    function refreshActiveTab() {
+        if (activeTab === 'results') {
+            silentLoadResults(currentTaskId);
+        } else {
+            silentLoadLogs(currentTaskId);
+        }
+    }
+
+    function refreshTableRows() {
+        // Сохраняем выбранные чекбоксы
+        var selectedIds = {};
+        document.querySelectorAll('.row-checkbox:checked').forEach(function(cb) {
+            selectedIds[cb.dataset.taskId] = true;
+        });
+
+        fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function(r) { return r.text(); })
+            .then(function(html) {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(html, 'text/html');
+                var newWrap = doc.getElementById('taskTableWrap');
+                var oldWrap = document.getElementById('taskTableWrap');
+                if (!newWrap || !oldWrap) return;
+                oldWrap.innerHTML = newWrap.innerHTML;
+
+                // Восстанавливаем чекбоксы
+                Object.keys(selectedIds).forEach(function(id) {
+                    var cb = oldWrap.querySelector('.row-checkbox[data-task-id="' + id + '"]');
+                    if (cb) cb.checked = true;
+                });
+
+                // Обновляем состояние батч-чекбоксов
+                document.querySelectorAll('.batch-checkbox').forEach(function(bcb) {
+                    updateBatchCheckbox(bcb.dataset.batchId);
+                });
+
+                bindRowClicks();
+                bindCheckboxes();
+                bindBatchToggle();
+                updateBulkBar();
+            })
+            .catch(function() {});
+    }
+
+    function bindRowClicks() {
+        document.querySelectorAll('tr[data-task-id]').forEach(function(row) {
+            row.addEventListener('click', function(e) {
+                if (e.target.closest('a, button, form, input')) return;
+                openModal(row.dataset.taskId);
+            });
+        });
+    }
+
+    // === Модальное окно ===
+    function openModal(taskId) {
+        currentTaskId = taskId;
+        title.textContent = 'Задача ' + taskId;
+        overlay.classList.add('active');
+        setActiveTab('logs');
+        startAutoRefresh();
+    }
+
+    function setActiveTab(tab) {
+        activeTab = tab;
+        tabs.forEach(function(t) {
+            t.classList.toggle('active', t.dataset.tab === tab);
+        });
+        if (tab === 'results') {
+            loadResults(currentTaskId);
+        } else {
+            loadLogs(currentTaskId);
+        }
+    }
+
+    function renderResults(data) {
+        var products = data.products || [];
+        var reviews = data.reviews || [];
+
+        var html = '<div class="results-summary">';
+        if (products.length) {
+            html += '<div class="card"><div style="font-size: 24px; font-weight: 700; color: #2563eb;">' + products.length + '</div><div style="font-size: 12px; color: #6b7280;">товаров</div></div>';
+        }
+        if (reviews.length) {
+            html += '<div class="card"><div style="font-size: 24px; font-weight: 700; color: #8b5cf6;">' + reviews.length + '</div><div style="font-size: 12px; color: #6b7280;">отзывов</div></div>';
+        }
+        html += '</div>';
+
+        if (products.length) {
+            html += '<h4 style="margin-bottom: 10px; font-size: 14px; color: #374151;">Товары</h4>';
+            products.forEach(function(p) {
+                html += '<div class="result-card"><div class="result-row">';
+                if (p.imageUrl) {
+                    html += '<img class="result-image" src="' + escapeHtml(p.imageUrl) + '" alt="" onerror="this.style.display=\'none\'">';
+                }
+                html += '<div style="flex:1">';
+                html += '<div class="result-title">' + escapeHtml(p.title) + '</div>';
+                html += '<div class="result-meta">';
+                if (p.price) {
+                    html += '<span class="result-price">' + escapeHtml(p.price) + ' \u20bd';
+                    if (p.originalPrice && p.originalPrice !== p.price) {
+                        html += '<span class="result-price-old">' + escapeHtml(p.originalPrice) + ' \u20bd</span>';
+                    }
+                    html += '</span>';
+                }
+                if (p.rating) {
+                    html += '<span class="result-rating">\u2605 ' + escapeHtml(p.rating) + '</span>';
+                }
+                if (p.reviewCount) {
+                    html += '<span>' + p.reviewCount + ' отзывов</span>';
+                }
+                if (p.category) {
+                    html += '<span>' + escapeHtml(p.category) + '</span>';
+                }
+                html += '<span style="color:#9ca3af;">ID: ' + p.externalId + '</span>';
+                html += '</div>';
+
+                if (p.characteristics && Object.keys(p.characteristics).length) {
+                    html += '<details class="result-chars"><summary>Характеристики (' + Object.keys(p.characteristics).length + ')</summary>';
+                    html += '<table class="result-chars-table">';
+                    Object.keys(p.characteristics).forEach(function(key) {
+                        var val = p.characteristics[key];
+                        if (Array.isArray(val)) val = val.join(', ');
+                        html += '<tr><td>' + escapeHtml(key) + '</td><td>' + escapeHtml(String(val)) + '</td></tr>';
+                    });
+                    html += '</table></details>';
+                }
+
+                html += '</div></div></div>';
+            });
+        }
+
+        if (reviews.length) {
+            html += '<h4 style="margin: 16px 0 10px; font-size: 14px; color: #374151;">Отзывы</h4>';
+            reviews.forEach(function(r) {
+                html += '<div class="review-card">';
+                html += '<div class="review-header">';
+                html += '<span class="review-author">' + escapeHtml(r.author || 'Аноним') + '</span>';
+                if (r.reviewDate) {
+                    html += '<span class="review-date">' + escapeHtml(r.reviewDate) + '</span>';
+                }
+                html += '</div>';
+                html += '<div class="review-stars">';
+                for (var i = 0; i < 5; i++) {
+                    html += i < r.rating ? '\u2605' : '\u2606';
+                }
+                html += '</div>';
+                if (r.productTitle) {
+                    html += '<div style="font-size: 12px; color: #6b7280; margin-bottom: 6px;">' + escapeHtml(r.productTitle) + '</div>';
+                }
+                if (r.text) {
+                    html += '<div class="review-text">' + escapeHtml(r.text) + '</div>';
+                }
+                if (r.pros) {
+                    html += '<div class="review-pros">\u2795 ' + escapeHtml(r.pros) + '</div>';
+                }
+                if (r.cons) {
+                    html += '<div class="review-cons">\u2796 ' + escapeHtml(r.cons) + '</div>';
+                }
+                if (r.firstReply) {
+                    html += '<div class="review-reply">\ud83d\udcac Ответ продавца: ' + escapeHtml(r.firstReply) + '</div>';
+                }
+                html += '</div>';
+            });
+        }
+
+        body.innerHTML = html;
+    }
+
+    // Счётчик уже отрисованных логов для инкрементального обновления
+    var renderedLogCount = 0;
+    var logsPlainText = '';
+    var logsLastTraceId = null;
+    var loadedSolverTraces = {};
+
+    function buildLogEntryHtml(log) {
+        var html = '';
+        if (log.traceId && log.traceId !== logsLastTraceId) {
+            logsLastTraceId = log.traceId;
+            var shortTrace = log.traceId.slice(0, 12);
+            html += '<div class="trace-group-header" data-trace-id="' + escapeHtml(log.traceId) + '">';
+            html += '\u25B6 trace <a href="/logs/trace/' + escapeHtml(log.traceId) + '" target="_blank">' + escapeHtml(shortTrace) + '\u2026</a>';
+            html += '</div>';
+            logsPlainText += '--- trace: ' + log.traceId + ' ---\n';
+        }
+        html += '<div class="log-entry">';
+        html += '<span class="log-time">' + escapeHtml(log.time) + '</span>';
+        html += '<span class="badge badge-' + escapeHtml(log.level) + '">' + escapeHtml(log.level) + '</span> ';
+        html += '<span class="log-channel">[' + escapeHtml(log.channel) + ']</span>';
+        html += '<span class="log-message">' + escapeHtml(log.message) + '</span>';
+        logsPlainText += log.time + ' ' + log.level + ' [' + log.channel + '] ' + log.message;
+        if (log.context && Object.keys(log.context).length) {
+            html += '<span class="log-context-toggle" onclick="var ctx=this.nextElementSibling;ctx.classList.toggle(\'open\');this.textContent=ctx.classList.contains(\'open\')?\'\u25BC контекст\':\'\u25B6 контекст\';">\u25B6 контекст</span>';
+            html += '<div class="log-context">' + escapeHtml(JSON.stringify(log.context, null, 2)) + '</div>';
+            logsPlainText += '\n' + JSON.stringify(log.context, null, 2);
+        }
+        html += '</div>';
+        logsPlainText += '\n';
+        return html;
+    }
+
+    function buildMetaHtml(taskMeta) {
+        if (!taskMeta) return '';
+        var html = '<div id="logsMetaBlock" style="display: flex; gap: 16px; margin-bottom: 14px; padding: 10px 14px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 13px; flex-wrap: wrap; align-items: center;">';
+        if (taskMeta.startedAt) {
+            html += '<span style="color: #6b7280;">Начало: <strong style="color: #111;">' + escapeHtml(taskMeta.startedAt) + '</strong></span>';
+        }
+        if (taskMeta.completedAt) {
+            html += '<span style="color: #6b7280;">Конец: <strong style="color: #111;">' + escapeHtml(taskMeta.completedAt) + '</strong></span>';
+        }
+        if (taskMeta.durationFormatted) {
+            var durColor = taskMeta.duration > 120 ? '#dc2626' : (taskMeta.duration > 30 ? '#f59e0b' : '#16a34a');
+            html += '<span style="color: #6b7280;">Время: <strong style="color: ' + durColor + ';">' + escapeHtml(taskMeta.durationFormatted) + '</strong></span>';
+        }
+        if (taskMeta.status) {
+            html += '<span class="badge badge-' + ({
+                'completed_success': 'success', 'completed_empty': 'warning', 'completed_skipped': 'skipped', 'completed_partial': 'warning',
+                'failed': 'error', 'running': 'info', 'pending': 'debug', 'paused': 'debug', 'cancelled': 'error'
+            }[taskMeta.status] || 'debug') + '" style="font-size: 11px;">' + escapeHtml(taskMeta.status) + '</span>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    function loadSolverLogs(container) {
+        var headers = container.querySelectorAll ? container.querySelectorAll('.trace-group-header') : [];
+        headers.forEach(function(header) {
+            var tid = header.dataset.traceId;
+            if (!tid || loadedSolverTraces[tid]) return;
+            loadedSolverTraces[tid] = true;
+            fetch('/logs/solver/' + encodeURIComponent(tid))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.logs || !data.logs.length) return;
+                    var block = document.createElement('div');
+                    block.className = 'solver-logs-block';
+                    var blockHtml = '<div style="padding: 2px 8px 4px 20px; font-size: 11px; color: #3b82f6; font-weight: 500;">Solver (' + data.count + ' записей)</div>';
+                    data.logs.forEach(function(sl) {
+                        blockHtml += '<div class="solver-log-entry">';
+                        blockHtml += '<span class="log-time">' + escapeHtml(sl.timestamp) + '</span>';
+                        blockHtml += '<span class="solver-badge">' + escapeHtml(sl.level) + '</span>';
+                        blockHtml += '<span style="color: #6366f1; font-size: 11px;">[' + escapeHtml(sl.module) + ':' + sl.line + ']</span>';
+                        blockHtml += '<span class="log-message" style="font-size: 12px;">' + escapeHtml(sl.message) + '</span>';
+                        blockHtml += '</div>';
+                    });
+                    block.innerHTML = blockHtml;
+                    header.parentNode.insertBefore(block, header.nextSibling);
+                })
+                .catch(function() {});
+        });
+    }
+
+    function bindCopyLogsBtn() {
+        var btn = document.getElementById('btnCopyLogs');
+        if (!btn || btn.dataset.bound) return;
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', function() {
+            navigator.clipboard.writeText(logsPlainText.trim()).then(function() {
+                btn.textContent = 'Скопировано!';
+                btn.classList.add('copied');
+                setTimeout(function() {
+                    btn.textContent = 'Скопировать логи';
+                    btn.classList.remove('copied');
+                }, 2000);
+            });
+        });
+    }
+
+    function renderLogs(logs, taskMeta) {
+        // Полная перерисовка — используется только при первом открытии вкладки
+        renderedLogCount = 0;
+        logsPlainText = '';
+        logsLastTraceId = null;
+        loadedSolverTraces = {};
+
+        var html = buildMetaHtml(taskMeta);
+        html += '<div style="margin-bottom: 12px; text-align: right;">';
+        html += '<button id="btnCopyLogs" style="padding: 6px 14px; background: #475569; color: #e2e8f0; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Скопировать логи</button>';
+        html += '</div>';
+        html += '<div id="logsContainer"></div>';
+        body.innerHTML = html;
+
+        var container = document.getElementById('logsContainer');
+        var fragment = '';
+        logs.forEach(function(log) {
+            fragment += buildLogEntryHtml(log);
+        });
+        container.innerHTML = fragment;
+        renderedLogCount = logs.length;
+
+        bindCopyLogsBtn();
+        loadSolverLogs(container);
+    }
+
+    // Инкрементальное обновление — дописывает только новые логи, обновляет мету
+    function appendNewLogs(logs, taskMeta) {
+        // Обновляем мета-блок точечно
+        var metaBlock = document.getElementById('logsMetaBlock');
+        if (taskMeta) {
+            var newMetaHtml = buildMetaHtml(taskMeta);
+            if (metaBlock) {
+                // Заменяем только содержимое мета-блока
+                var tmp = document.createElement('div');
+                tmp.innerHTML = newMetaHtml;
+                metaBlock.parentNode.replaceChild(tmp.firstChild, metaBlock);
+            } else {
+                // Мета-блока не было — вставляем перед кнопкой
+                var btnWrap = body.querySelector('#btnCopyLogs');
+                if (btnWrap) {
+                    var tmp2 = document.createElement('div');
+                    tmp2.innerHTML = newMetaHtml;
+                    btnWrap.parentNode.parentNode.insertBefore(tmp2.firstChild, btnWrap.parentNode);
+                }
+            }
+        }
+
+        // Дописываем только новые записи
+        var newLogs = logs.slice(renderedLogCount);
+        if (!newLogs.length) return;
+
+        var container = document.getElementById('logsContainer');
+        if (!container) return;
+
+        var fragment = '';
+        newLogs.forEach(function(log) {
+            fragment += buildLogEntryHtml(log);
+        });
+
+        // Вставляем новые элементы без перерисовки старых
+        var tmp = document.createElement('div');
+        tmp.innerHTML = fragment;
+        while (tmp.firstChild) {
+            container.appendChild(tmp.firstChild);
+        }
+        renderedLogCount = logs.length;
+
+        // Загружаем solver-логи только для новых trace
+        loadSolverLogs(container);
+    }
+
+    function loadResults(taskId) {
+        body.innerHTML = '<div class="log-loading">Загрузка\u2026</div>';
+        body.dataset.resultsMarker = '';
+        fetch('/tasks/' + taskId + '/results')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var products = data.products || [];
+                var reviews = data.reviews || [];
+                if (!products.length && !reviews.length) {
+                    body.innerHTML = '<div class="log-empty">Результаты не найдены</div>';
+                    return;
+                }
+                body.dataset.resultsMarker = products.length + ':' + reviews.length;
+                renderResults(data);
+            })
+            .catch(function() {
+                body.innerHTML = '<div class="log-empty">Ошибка загрузки результатов</div>';
+            });
+    }
+
+    function loadLogs(taskId) {
+        body.innerHTML = '<div class="log-loading">Загрузка\u2026</div>';
+        body.dataset.logsMarker = '';
+        fetch('/tasks/' + taskId + '/logs')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var logs = data.logs || data;
+                var taskMeta = data.taskMeta || null;
+                if (!logs.length) {
+                    body.innerHTML = '<div class="log-empty">Логи не найдены</div>';
+                    return;
+                }
+                body.dataset.logsMarker = logs.length + ':' + (taskMeta ? taskMeta.duration : '');
+                renderLogs(logs, taskMeta);
+            })
+            .catch(function() {
+                body.innerHTML = '<div class="log-empty">Ошибка загрузки логов</div>';
+            });
+    }
+
+    function closeModal() {
+        overlay.classList.remove('active');
+        currentTaskId = null;
+        stopAutoRefresh();
+        renderedLogCount = 0;
+        logsPlainText = '';
+        logsLastTraceId = null;
+        loadedSolverTraces = {};
+    }
+
+    function silentLoadResults(taskId) {
+        fetch('/tasks/' + taskId + '/results')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (activeTab !== 'results' || currentTaskId !== taskId) return;
+                var products = data.products || [];
+                var reviews = data.reviews || [];
+                if (!products.length && !reviews.length) return;
+                var marker = products.length + ':' + reviews.length;
+                if (body.dataset.resultsMarker === marker) return;
+                var scrollPos = body.scrollTop;
+                body.dataset.resultsMarker = marker;
+                renderResults(data);
+                body.scrollTop = scrollPos;
+            })
+            .catch(function() {});
+    }
+
+    function silentLoadLogs(taskId) {
+        fetch('/tasks/' + taskId + '/logs')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (activeTab !== 'logs' || currentTaskId !== taskId) return;
+                var logs = data.logs || data;
+                var taskMeta = data.taskMeta || null;
+                var marker = logs.length + ':' + (taskMeta ? taskMeta.duration : '');
+                if (body.dataset.logsMarker === marker) return;
+                body.dataset.logsMarker = marker;
+                var wasAtBottom = (body.scrollHeight - body.scrollTop - body.clientHeight) < 30;
+                appendNewLogs(logs, taskMeta);
+                if (wasAtBottom) {
+                    body.scrollTop = body.scrollHeight;
+                }
+            })
+            .catch(function() {});
+    }
+
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // Инициализация
+    bindRowClicks();
+    bindCheckboxes();
+    bindBatchToggle();
+
+    tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            setActiveTab(tab.dataset.tab);
+        });
+    });
+
+    closeBtn.addEventListener('click', closeModal);
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeModal();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeModal();
+    });
+
+    // Автообновление таблицы — каждые 5 сек
+    setInterval(refreshTableRows, TABLE_REFRESH);
+})();
+</script>
+{% endblock %}

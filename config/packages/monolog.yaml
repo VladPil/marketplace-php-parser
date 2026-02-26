@@ -1,0 +1,41 @@
+monolog:
+    channels:
+        - parser
+        - admin
+
+    handlers:
+        # Основной файловый handler для всех ошибок
+        main_file:
+            type: stream
+            path: "%kernel.logs_dir%/%kernel.environment%.log"
+            level: warning
+            channels: ["!event", "!parser"]
+            formatter: App\Shared\Logging\AdminFileFormatter
+
+        # stderr — для Docker-логов админки (info+)
+        stderr:
+            type: stream
+            path: "php://stderr"
+            level: info
+            channels: ["!event", "!doctrine", "!parser"]
+            formatter: App\Shared\Logging\AdminFileFormatter
+
+        # Запись логов админки в БД (только канал admin, info+)
+        admin_db:
+            type: service
+            id: App\Shared\Logging\DatabaseLogHandler
+            channels: [admin]
+
+        # stdout для парсера — красивый формат с цветами
+        parser_stdout:
+            type: stream
+            path: "php://stdout"
+            level: debug
+            channels: [parser]
+            formatter: App\Shared\Logging\ParseLineFormatter
+
+        # Консольный handler для Symfony-команд
+        console:
+            type: console
+            process_psr_3_messages: false
+            channels: ["!event", "!doctrine", "!parser"]

@@ -1,0 +1,241 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    # Shared components
+    App\Shared\:
+        resource: '../src/Shared/'
+
+    # Admin module
+    App\Module\Admin\:
+        resource: '../src/Module/Admin/'
+
+    # Parser module
+    App\Module\Parser\:
+        resource: '../src/Module/Parser/'
+        exclude:
+            - '../src/Module/Parser/Config/'
+
+    # Parser Config objects
+    App\Module\Parser\Config\DatabaseConfig:
+        arguments:
+            $host: '%env(default::POSTGRES_HOST)%'
+            $port: '%env(int:default::POSTGRES_PORT)%'
+            $database: '%env(default::POSTGRES_DB)%'
+            $user: '%env(default::POSTGRES_USER)%'
+            $password: '%env(default::POSTGRES_PASSWORD)%'
+            $poolSize: 10
+
+    App\Module\Parser\Config\RedisConfig:
+        arguments:
+            $host: '%env(default::REDIS_HOST)%'
+            $port: '%env(int:default::REDIS_PORT)%'
+            $database: '%env(int:default::REDIS_DB)%'
+            $poolSize: 5
+            $prefix: 'mp:parse:'
+
+    App\Module\Parser\Config\HttpConfig:
+        arguments:
+            $apiHost: '%env(default::MP_API_HOST)%'
+            $apiPort: '%env(int:default::MP_API_PORT)%'
+            $ssl: '%env(bool:default::MP_API_SSL)%'
+            $connectionTimeoutSeconds: '%env(int:default::MP_CONNECTION_TIMEOUT)%'
+            $requestTimeoutSeconds: '%env(int:default::MP_REQUEST_TIMEOUT)%'
+            $proxyList: '%env(default::MP_PROXY_LIST)%'
+            $proxyEnabled: '%env(bool:default::MP_PROXY_ENABLED)%'
+
+    App\Module\Parser\Config\RetryConfig:
+        arguments:
+            $maxRetries: '%env(int:default::PARSER_MAX_RETRIES)%'
+            $baseDelaySeconds: '%env(float:default::PARSER_RETRY_BASE_DELAY)%'
+            $maxDelaySeconds: '%env(float:default::PARSER_RETRY_MAX_DELAY)%'
+            $jitterFactor: '%env(float:default::PARSER_RETRY_JITTER)%'
+
+    App\Module\Parser\Config\SolverConfig:
+        arguments:
+            $host: '%env(default::SOLVER_HOST)%'
+            $port: '%env(int:default::SOLVER_PORT)%'
+            $requestTimeoutSeconds: '%env(int:default::SOLVER_REQUEST_TIMEOUT)%'
+            $connectionTimeoutSeconds: '%env(int:default::SOLVER_CONNECT_TIMEOUT)%'
+            $sessionTtlSeconds: '%env(int:default::SOLVER_SESSION_TTL)%'
+            $maxSolveRetries: '%env(int:default::SOLVER_MAX_RETRIES)%'
+
+    App\Module\Parser\Config\ParserConfig:
+        arguments:
+            $rateLimit: '%env(int:default::PARSER_RATE_LIMIT)%'
+            $workers: '%env(int:default::PARSER_WORKERS)%'
+            $healthPort: 9501
+            $maxReviewPages: 500
+            $maxTaskTimeoutSeconds: '%env(int:default::PARSER_MAX_TASK_TIMEOUT)%'
+
+    App\Module\Parser\Proxy\Config\ProxyRotationConfig:
+        arguments:
+            $circuitBreakerThreshold: '%env(int:default::OZON__PROXY__CB_THRESHOLD)%'
+            $circuitBreakerTimeoutSeconds: '%env(int:default::OZON__PROXY__CB_TIMEOUT)%'
+            $stickySessionTtlSeconds: '%env(int:default::OZON__PROXY__STICKY_TTL)%'
+
+    # Identity Pool — конфигурация пула identity (proxy + cookies + UA)
+    App\Module\Parser\Identity\IdentityPoolConfig:
+        arguments:
+            $identityTtlSeconds: '%env(int:default::IDENTITY_TTL)%'
+            $warmerIntervalSeconds: '%env(int:default::IDENTITY_WARMER_INTERVAL)%'
+            $sanitizerIntervalSeconds: '%env(int:default::IDENTITY_SANITIZER_INTERVAL)%'
+            $maxIdentityRetries: '%env(int:default::IDENTITY_MAX_RETRIES)%'
+            $warmupUrl: '%env(default::IDENTITY_WARMUP_URL)%'
+
+    # --- Логирование ---
+
+    App\Shared\Logging\ParseLogger:
+        arguments:
+            $formatter: '@App\Shared\Logging\ParseLineFormatter'
+
+    # DatabaseLogHandler: запись логов админки в parse_logs через Doctrine
+    App\Shared\Logging\DatabaseLogHandler:
+        arguments:
+            $level: !php/const Monolog\Level::Info
+
+    # Форматтеры (используются в monolog.yaml)
+    App\Shared\Logging\ParseLineFormatter: ~
+    App\Shared\Logging\AdminFileFormatter: ~
+
+    # Connection pools (shared singletons)
+    App\Module\Parser\Storage\PgConnectionPool:
+        shared: true
+
+    App\Module\Parser\Queue\RedisConnectionPool:
+        shared: true
+
+    App\Shared\Infrastructure\RedisPoolInterface:
+        alias: App\Module\Parser\Queue\RedisConnectionPool
+
+    # Admin Redis service (Symfony RedisAdapter)
+    App\Module\Admin\Service\RedisQueueService:
+        arguments:
+            $redisDsn: 'redis://%env(default::REDIS_HOST)%:%env(default::REDIS_PORT)%'
+
+
+    # Admin: сервис статистики прокси (Redis + DB)
+    App\Module\Admin\Service\ProxyStatsService:
+        arguments:
+            $redisDsn: 'redis://%env(default::REDIS_HOST)%:%env(default::REDIS_PORT)%'
+
+    App\Module\Admin\Service\IdentityPoolStats:
+        arguments:
+            $redisDsn: 'redis://%env(default::REDIS_HOST)%:%env(default::REDIS_PORT)%'
+
+    # Admin Solver health checker
+    App\Module\Admin\Service\SolverHealthChecker:
+        arguments:
+            $solverHost: '%env(default::SOLVER_HOST)%'
+            $solverPort: '%env(int:default::SOLVER_PORT)%'
+
+    # Contract bindings — Queue & Messaging
+    App\Shared\Contract\QueuePublisherInterface:
+        alias: App\Module\Parser\Queue\RedisQueuePublisher
+
+    App\Shared\Contract\QueueConsumerInterface:
+        alias: App\Module\Parser\Queue\RedisConsumer
+
+    App\Shared\Contract\ProgressTrackerInterface:
+        alias: App\Module\Parser\Queue\RedisProgressTracker
+
+    App\Shared\Contract\DeduplicatorInterface:
+        alias: App\Module\Parser\Queue\RedisDeduplicator
+
+    # Contract bindings — Storage
+    App\Shared\Contract\ProductStorageInterface:
+        alias: App\Module\Parser\Storage\ProductStorage
+
+    App\Shared\Contract\TaskStorageInterface:
+        alias: App\Module\Parser\Storage\TaskStorage
+
+    App\Shared\Contract\CategoryStorageInterface:
+        alias: App\Module\Parser\Storage\CategoryStorage
+
+    # Contract bindings — Marketplace
+    App\Shared\Contract\MarketplaceApiClientInterface:
+        alias: App\Module\Parser\Marketplace\Ozon\OzonApiClient
+
+    App\Shared\Contract\ProductParserInterface:
+        alias: App\Module\Parser\Marketplace\Ozon\OzonProductParser
+
+    App\Shared\Contract\ReviewParserInterface:
+        alias: App\Module\Parser\Marketplace\Ozon\OzonReviewParser
+
+    App\Shared\Contract\SearchParserInterface:
+        alias: App\Module\Parser\Marketplace\Ozon\OzonSearchParser
+
+    App\Shared\Contract\CategoryExtractorInterface:
+        alias: App\Module\Parser\Marketplace\Ozon\OzonCategoryExtractor
+
+    App\Shared\Contract\HeadersProviderInterface:
+        alias: App\Module\Parser\Marketplace\Ozon\OzonHeadersProvider
+
+    # Contract bindings — Solver integration
+    App\Shared\Contract\SolverClientInterface:
+        alias: App\Module\Parser\Marketplace\Ozon\SolverClient
+
+    App\Shared\Contract\SessionManagerInterface:
+        alias: App\Module\Parser\Session\SessionManager
+
+    App\Module\Parser\Proxy\CompositeProxyRotator:
+        arguments:
+            $logger: '@App\Shared\Logging\ParseLogger'
+
+    App\Module\Parser\Proxy\ProxyRotatorInterface:
+        alias: App\Module\Parser\Proxy\CompositeProxyRotator
+
+    App\Module\Parser\Proxy\ProxyHealthTrackerInterface:
+        alias: App\Module\Parser\Proxy\ProxyHealthTracker
+
+    App\Module\Parser\Proxy\CircuitBreakerProxyFilterInterface:
+        alias: App\Module\Parser\Proxy\CircuitBreakerProxyFilter
+
+
+
+parameters:
+    # PostgreSQL
+    env(POSTGRES_HOST): 'postgres'
+    env(POSTGRES_PORT): '5432'
+    env(POSTGRES_DB): 'mp_parser'
+    env(POSTGRES_USER): 'mp'
+    env(POSTGRES_PASSWORD): 'mp_secret'
+    # Redis
+    env(REDIS_HOST): 'redis'
+    env(REDIS_PORT): '6379'
+    env(REDIS_DB): '0'
+    # Parser
+    env(PARSER_RATE_LIMIT): '5'
+    env(PARSER_WORKERS): '4'
+    env(PARSER_MAX_RETRIES): '3'
+    env(PARSER_MAX_TASK_TIMEOUT): '900'
+    # Solver integration
+    env(SOLVER_HOST): 'host.docker.internal'
+    env(SOLVER_PORT): '8204'
+    env(SOLVER_REQUEST_TIMEOUT): '180'
+    env(SOLVER_CONNECT_TIMEOUT): '10'
+    env(SOLVER_SESSION_TTL): '1500'
+    env(SOLVER_MAX_RETRIES): '2'
+    # HTTP / API маркетплейса
+    env(MP_API_HOST): 'www.ozon.ru'
+    env(MP_API_PORT): '443'
+    env(MP_API_SSL): 'true'
+    env(MP_CONNECTION_TIMEOUT): '30'
+    env(MP_REQUEST_TIMEOUT): '60'
+    env(MP_PROXY_LIST): ''
+    env(MP_PROXY_ENABLED): 'false'
+    # Retry
+    env(PARSER_RETRY_BASE_DELAY): '2.0'
+    env(PARSER_RETRY_MAX_DELAY): '30.0'
+    env(PARSER_RETRY_JITTER): '0.25'
+    # Proxy rotation
+    env(OZON__PROXY__CB_THRESHOLD): '3'
+    env(OZON__PROXY__CB_TIMEOUT): '30'
+    env(OZON__PROXY__STICKY_TTL): '300'
+    # Identity Pool
+    env(IDENTITY_TTL): '1200'
+    env(IDENTITY_WARMER_INTERVAL): '30'
+    env(IDENTITY_SANITIZER_INTERVAL): '5'
+    env(IDENTITY_MAX_RETRIES): '2'
+    env(IDENTITY_WARMUP_URL): 'https://www.ozon.ru/product/balaklava-turn-off-on-new-965672325/'

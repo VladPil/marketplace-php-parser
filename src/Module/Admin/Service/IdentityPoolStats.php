@@ -1,0 +1,131 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Module\Admin\Service;
+
+use Symfony\Component\Cache\Adapter\RedisAdapter;
+
+/**
+ * Сервис статистики пула identity для админ-панели.
+ *
+ * Читает напрямую из Redis ключи mp:identity:* для отображения
+ * количества прогретых/активных/карантинных identity в sidebar и на странице здоровья.
+ *
+ * Работает в FPM-контейнере (админка), поэтому использует Symfony RedisAdapter,
+ * а не Swoole RedisConnectionPool.
+ */
+final class IdentityPoolStats
+{
+    private const KEY_READY = 'mp:identity:ready';
+    private const KEY_ACTIVE = 'mp:identity:active';
+    private const KEY_QUARANTINE = 'mp:identity:quarantine';
+    private const KEY_DATA_PREFIX = 'mp:identity:data:';
+
+    private \Redis $redis;
+
+    public function __construct(
+        string $redisDsn = 'redis://redis:6379',
+    ) {
+        $this->redis = RedisAdapter::createConnection($redisDsn);
+    }
+
+    /**
+     * Возвращает полную статистику пула identity.
+     *
+     * @return array{
+     *     ready: int,
+     *     active: int,
+     *     quarantine: int,
+     *     total: int,
+     *     identities: list<array{
+     *         id: string,
+     *         short_id: string,
+     *         proxy: string,
+     *         proxy_type: string,
+     *         status: string,
+     *         cookies: int,
+     *         created_at: string|null,
+     *         claimed_by: string|null,
+     *     }>,
+     * }
+     */
+    public function getStats(): array
+    {
+        try {
+            $readyCount = (int) $this->redis->lLen(self::KEY_READY);
+            $activeCount = (int) $this->redis->sCard(self::KEY_ACTIVE);
+            $quarantineCount = (int) $this->redis->lLen(self::KEY_QUARANTINE);
+
+
+            $allIds = array_unique(array_merge(
+                $this->redis->lRange(self::KEY_READY, 0, -1) ?: [],
+                $this->redis->sMembers(self::KEY_ACTIVE) ?: [],
+                $this->redis->lRange(self::KEY_QUARANTINE, 0, -1) ?: [],
+            ));
+
+            $identities = [];
+            if (!empty($allIds)) {
+                $keys = array_map(fn(string $id) => self::KEY_DATA_PREFIX . $id, $allIds);
+                $values = $this->redis->mGet($keys) ?: [];
+
+                foreach ($values as $json) {
+                    if ($json === false || !is_string($json)) {
+                        continue;
+                    }
+
+                    $data = json_decode($json, true);
+                    if (!is_array($data)) {
+                        continue;
+                    }
+
+                    $proxy = $data['proxy_address'] ?? null;
+                    $maskedProxy = $proxy !== null ? $this->maskProxy($proxy) : 'direct';
+
+                    $cookies = 0;
+                    if (isset($data['session']['cookies']) && is_array($data['session']['cookies'])) {
+                        $cookies = count($data['session']['cookies']);
+                    }
+
+                    $createdAt = isset($data['created_at'])
+                        ? date('Y-m-d H:i:s', (int) $data['created_at'])
+                        : null;
+
+                    $identities[] = [
+                        'id' => $data['id'] ?? 'unknown',
+                        'short_id' => substr($data['id'] ?? 'unknown', 0, 8),
+                        'proxy' => $maskedProxy,
+                        'proxy_type' => $data['proxy_type'] ?? 'static',
+                        'status' => $data['status'] ?? 'unknown',
+                        'cookies' => $cookies,
+                        'created_at' => $createdAt,
+                        'claimed_by' => $data['claimed_by'] ?? null,
+                    ];
+                }
+            }
+
+            return [
+                'ready' => $readyCount,
+                'active' => $activeCount,
+                'quarantine' => $quarantineCount,
+                'total' => $readyCount + $activeCount + $quarantineCount,
+                'identities' => $identities,
+            ];
+        } catch (\Throwable) {
+            return [
+                'ready' => 0,
+                'active' => 0,
+                'quarantine' => 0,
+                'total' => 0,
+                'identities' => [],
+            ];
+        }
+    }
+
+    private function maskProxy(string $proxy): string
+    {
+        $parts = explode('@', $proxy);
+
+        return count($parts) > 1 ? '***@' . end($parts) : $proxy;
+    }
+}

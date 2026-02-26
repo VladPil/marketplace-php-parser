@@ -1,0 +1,26 @@
+includes:
+    - vendor/phpstan/phpstan-symfony/extension.neon
+    - vendor/phpstan/phpstan-doctrine/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - src
+    scanDirectories:
+        - vendor/swoole/ide-helper
+    tmpDir: var/cache/phpstan
+    doctrine:
+        objectManagerLoader: null
+    ignoreErrors:
+        -
+            identifier: property.onlyRead
+            path: src/Shared/Entity/
+            reportUnmatched: false
+        -
+            identifier: property.onlyWritten
+            path: src/Module/Parser/Proxy/
+        -
+            identifier: trait.unused
+            reportUnmatched: false
+    excludePaths:
+        - src/Kernel.php

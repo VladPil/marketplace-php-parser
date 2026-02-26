@@ -1,0 +1,5 @@
+controllers:
+    resource:
+        path: ../src/Module/Admin/Controller/
+        namespace: App\Module\Admin\Controller
+    type: attribute

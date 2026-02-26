@@ -1,0 +1,50 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Трассировка {{ traceId|slice(0, 8) }}{% endblock %}
+
+{% block content %}
+    <a href="{{ path('log_list') }}" class="back-link">&larr; К списку логов</a>
+
+    <h1>Трассировка {{ traceId }}</h1>
+
+    {% if logs is empty %}
+        <div class="card">Логи для данной трассировки не найдены.</div>
+    {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Время</th>
+                    <th>Уровень</th>
+                    <th>Канал</th>
+                    <th>Trace ID</th>
+                    <th>Задача</th>
+                    <th>Сообщение</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                    <tr>
+                        <td>{{ log.createdAt|date('d.m.Y H:i:s', 'Europe/Moscow') }}</td>
+                        <td><span class="badge badge-{{ log.level }}">{{ log.level }}</span></td>
+                        <td>{{ log.channel }}</td>
+                        <td>
+                            <a href="{{ path('log_by_trace', {traceId: log.traceId}) }}">
+                                {{ log.traceId|slice(0, 8) }}...
+                            </a>
+                        </td>
+                        <td>
+                            {% if log.parseTaskId %}
+                                <a href="{{ path('log_by_task', {taskId: log.parseTaskId}) }}">
+                                    {{ log.parseTaskId|slice(0, 8) }}...
+                                </a>
+                            {% else %}
+                                <span style="color: #999;">&mdash;</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.message|length > 120 ? log.message|slice(0, 120) ~ '...' : log.message }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endblock %}
