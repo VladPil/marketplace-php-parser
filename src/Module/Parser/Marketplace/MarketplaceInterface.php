@@ -10,7 +10,6 @@ use App\Shared\Contract\CategoryExtractorInterface;
 use App\Shared\Contract\MarketplaceApiClientInterface;
 use App\Shared\Contract\ProductParserInterface;
 use App\Shared\Contract\ReviewParserInterface;
-use App\Shared\Contract\SearchParserInterface;
 
 #[AutoconfigureTag('app.marketplace')]
 interface MarketplaceInterface
@@ -19,6 +18,5 @@ interface MarketplaceInterface
     public function getApiClient(): MarketplaceApiClientInterface;
     public function getProductParser(): ProductParserInterface;
     public function getReviewParser(): ReviewParserInterface;
-    public function getSearchParser(): SearchParserInterface;
     public function getCategoryExtractor(): CategoryExtractorInterface;
 }

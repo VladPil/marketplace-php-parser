@@ -173,7 +173,7 @@
                     {% for task in recentTasks %}
                     <tr>
                         <td><code>{{ task.id|slice(0, 8) }}</code></td>
-                        <td>{{ {search: 'Поиск', product: 'Товар', reviews: 'Отзывы'}[task.type] ?? task.type }}</td>
+                        <td>{{ {product: 'Товар', reviews: 'Отзывы'}[task.type] ?? task.type }}</td>
                         <td>
                             <span class="badge badge-{{ statusBadge[task.status] ?? 'debug' }}">
                                 {{ statusLabel[task.status] ?? task.status }}

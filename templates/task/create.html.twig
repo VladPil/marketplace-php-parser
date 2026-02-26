@@ -109,7 +109,6 @@
             <label for="type">Тип задачи</label>
             <select name="type" id="type">
                 <option value="">— Выберите тип —</option>
-                <option value="search">Поиск товаров</option>
                 <option value="product">Парсинг товара</option>
                 <option value="reviews">Парсинг отзывов</option>
             </select>
@@ -125,16 +124,6 @@
         </div>
 
         {# === Параметры для одиночного режима === #}
-        <div id="params-search" class="task-params">
-            <div class="form-group">
-                <label for="query">Поисковый запрос</label>
-                <input type="text" name="query" id="query" placeholder="Например: наушники bluetooth">
-            </div>
-            <div class="form-group">
-                <label for="max_products">Макс. товаров</label>
-                <input type="number" name="max_products" id="max_products" value="100" min="1" max="1000">
-            </div>
-        </div>
 
         {# Общие поля для product и reviews (один набор — без дублей name) #}
         <div id="params-item" class="task-params">
@@ -421,14 +410,11 @@ naushniki-jbl-987654321
     function toggleParams() {
         document.querySelectorAll('.task-params').forEach(function(el) { el.classList.remove('active'); });
         if (currentMode === 'single' && currentType) {
-            if (currentType === 'search') {
-                var el = document.getElementById('params-search');
-                if (el) el.classList.add('active');
-            } else if (currentType === 'product' || currentType === 'reviews') {
+            if (currentType === 'product' || currentType === 'reviews') {
                 // Общие поля slug/external_id для product и reviews
                 var itemEl = document.getElementById('params-item');
                 if (itemEl) itemEl.classList.add('active');
-                // Доп. поле max_pages только для reviews
+                // Доп. поля только для reviews
                 if (currentType === 'reviews') {
                     var extraEl = document.getElementById('params-reviews-extra');
                     if (extraEl) extraEl.classList.add('active');
@@ -438,7 +424,6 @@ naushniki-jbl-987654321
             }
         }
     }
-
     // === Переключение режима ===
     document.querySelectorAll('.mode-btn[data-mode]').forEach(function(btn) {
         btn.addEventListener('click', function() {

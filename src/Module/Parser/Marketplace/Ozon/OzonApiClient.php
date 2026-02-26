@@ -404,12 +404,6 @@ final class OzonApiClient implements MarketplaceApiClientInterface
         return $jar;
     }
 
-    public function searchProducts(string $query, int $page = 1): array
-    {
-        return $this->fetchPage('/api/entrypoint-api.bx/page/json/v2', [
-            'url' => '/search/?text=' . urlencode($query) . '&page=' . $page,
-        ]);
-    }
 
     public function fetchProduct(string $slug, int $externalId): array
     {

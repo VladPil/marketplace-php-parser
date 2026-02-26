@@ -28,10 +28,7 @@ final class CreateParseTaskRequest extends AbstractRequest
         $params = [];
         $collectProductData = false;
 
-        if ($type === 'search') {
-            $params['query'] = $request->request->getString('query');
-            $params['max_products'] = $request->request->getInt('max_products', 100);
-        } elseif ($type === 'product' || $type === 'reviews') {
+        if ($type === 'product' || $type === 'reviews') {
             $rawId = $request->request->getString('external_id');
             $params['external_id'] = $rawId !== '' ? (int) $rawId : 0;
             $params['slug'] = $request->request->getString('slug');

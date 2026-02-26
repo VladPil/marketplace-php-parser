@@ -8,8 +8,7 @@ namespace App\Shared\Contract;
  * Контракт для HTTP-клиента маркетплейса.
  *
  * Реализации выполняют запросы к API маркетплейса
- * для получения страниц, поиска товаров, получения
- * карточек товаров и отзывов.
+ * для получения карточек товаров и отзывов.
  */
 interface MarketplaceApiClientInterface
 {
@@ -21,15 +20,6 @@ interface MarketplaceApiClientInterface
      * @return array Декодированный ответ API
      */
     public function fetchPage(string $path, array $queryParams = []): array;
-
-    /**
-     * Выполняет поиск товаров по текстовому запросу.
-     *
-     * @param string $query Поисковый запрос
-     * @param int    $page  Номер страницы результатов (начиная с 1)
-     * @return array Массив результатов поиска
-     */
-    public function searchProducts(string $query, int $page = 1): array;
 
     /**
      * Получает данные карточки товара.
