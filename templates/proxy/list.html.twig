@@ -24,11 +24,17 @@
 .rotation-url-row { margin-top: 8px; display: none; }
 .rotation-url-row.visible { display: flex; }
 .rotation-url-input { flex: 1; padding: 6px 8px; font-family: monospace; font-size: 12px; border: 1px solid #ddd; border-radius: 4px; }
-.rotation-url-cell { max-width: 200px; }
+.rotation-url-cell { min-width: 180px; }
 .rotation-url-cell form { display: flex; gap: 4px; align-items: center; }
 .rotation-url-cell input { width: 100%; padding: 3px 6px; font-family: monospace; font-size: 11px; border: 1px solid #ddd; border-radius: 3px; }
 .rotation-url-cell .btn-save-url { padding: 3px 8px; border: 1px solid #ddd; border-radius: 3px; cursor: pointer; font-size: 11px; background: #f0fdf4; color: #166534; white-space: nowrap; }
-.rotation-url-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 11px; background: #ede9fe; color: #7c3aed; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-toggle { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.col-toggle-btn { padding: 4px 10px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 12px; background: #f9fafb; color: #374151; display: inline-flex; align-items: center; gap: 4px; }
+.col-toggle-btn:hover { background: #f3f4f6; }
+.col-toggle-panel { display: none; flex-wrap: wrap; gap: 6px 14px; padding: 10px 12px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 12px; }
+.col-toggle-panel.open { display: flex; }
+.col-toggle-panel label { font-size: 12px; display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; user-select: none; }
+.col-toggle-panel input[type=checkbox] { margin: 0; }
 {% endblock %}
 
 {% block content %}
@@ -86,7 +92,7 @@
 
 {# --- Макрос для отрисовки колонок статистики --- #}
 {% macro proxyStatsRow(s) %}
-    <td>
+    <td data-col="health">
         {% if s.type|default('static') == 'rotating' %}
             <span style="color: #aaa;" title="Health не применим для ротационных прокси">—</span>
         {% else %}
@@ -102,7 +108,7 @@
             <span class="health-score" style="color: {{ hColor }};">{{ s.health }}</span>
         {% endif %}
     </td>
-    <td>
+    <td data-col="cb">
         {% if s.type|default('static') == 'rotating' %}
             <span style="color: #aaa;" title="Circuit breaker не применим для ротационных прокси">—</span>
         {% else %}
@@ -117,7 +123,7 @@
             {% endif %}
         {% endif %}
     </td>
-    <td>
+    <td data-col="sessions">
         <span class="sessions-info">
             <span title="Всего">{{ s.solverTotal }}</span>
             {% if s.solverTotal > 0 %}
@@ -125,14 +131,14 @@
             {% endif %}
         </span>
     </td>
-    <td>
+    <td data-col="sticky">
         {% if s.stickySessions > 0 %}
             <span class="sticky-count">{{ s.stickySessions }}</span>
         {% else %}
             <span style="color: #ccc;">—</span>
         {% endif %}
     </td>
-    <td>
+    <td data-col="last_used">
         {% if s.lastUsed %}
             <span class="last-used-time">{{ s.lastUsed|date('d.m.Y H:i') }}</span>
         {% else %}
@@ -143,28 +149,32 @@
 
 {% if envProxies is not empty %}
 <div class="card" style="margin-bottom: 20px;">
-    <h3 style="margin-bottom: 12px;">ENV-прокси ({{ envProxies|length }})</h3>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+        <h3 style="margin: 0;">ENV-прокси ({{ envProxies|length }})</h3>
+        <button type="button" class="col-toggle-btn" data-target="col-panel-env">⚙ Колонки</button>
+    </div>
+    <div class="col-toggle-panel" id="col-panel-env"></div>
     <div style="overflow-x: auto;">
-    <table class="proxy-table">
+    <table class="proxy-table" id="table-env">
         <thead>
             <tr>
-                <th>Адрес</th>
-                <th>Источник</th>
-                <th>Тип</th>
-                <th data-sortable>Health</th>
-                <th data-sortable>Circuit Breaker</th>
-                <th data-sortable>Solver-сессии</th>
-                <th data-sortable>Sticky</th>
-                <th data-sortable>Посл. использование</th>
+                <th data-col="address">Адрес</th>
+                <th data-col="source">Источник</th>
+                <th data-col="type">Тип</th>
+                <th data-col="health" data-sortable>Health</th>
+                <th data-col="cb" data-sortable>Circuit Breaker</th>
+                <th data-col="sessions" data-sortable>Solver-сессии</th>
+                <th data-col="sticky" data-sortable>Sticky</th>
+                <th data-col="last_used" data-sortable>Посл. использование</th>
             </tr>
         </thead>
         <tbody>
             {% for proxy in envProxies %}
             {% set s = stats.perProxy[proxy.proxyId] | default({type: 'static', health: 1.0, cbState: 'unknown', cbFailures: 0, stickySessions: 0, solverTotal: 0, solverSuccess: 0, solverError: 0, lastUsed: null}) %}
             <tr>
-                <td style="font-family: monospace; font-size: 13px;">{{ proxy.address }}</td>
-                <td><span class="badge badge-info">env</span></td>
-                <td><span style="font-size: 12px;">статический</span></td>
+                <td data-col="address" style="font-family: monospace; font-size: 13px;">{{ proxy.address }}</td>
+                <td data-col="source"><span class="badge badge-info">env</span></td>
+                <td data-col="type"><span style="font-size: 12px;">статический</span></td>
                 {{ _self.proxyStatsRow(s) }}
             </tr>
             {% endfor %}
@@ -175,26 +185,32 @@
 {% endif %}
 
 <div class="card">
-    <h3 style="margin-bottom: 12px;">Прокси из админки ({{ adminProxies|length }})</h3>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+        <h3 style="margin: 0;">Прокси из админки ({{ adminProxies|length }})</h3>
+        {% if adminProxies is not empty %}
+            <button type="button" class="col-toggle-btn" data-target="col-panel-admin">⚙ Колонки</button>
+        {% endif %}
+    </div>
+    <div class="col-toggle-panel" id="col-panel-admin"></div>
     {% if adminProxies is empty %}
         <p style="color: #888;">Нет добавленных прокси</p>
     {% else %}
     <div style="overflow-x: auto;">
-    <table class="proxy-table">
+    <table class="proxy-table" id="table-admin">
         <thead>
             <tr>
-                <th>Адрес</th>
-                <th>Источник</th>
-                <th>Тип</th>
-                <th>Статус</th>
-                <th data-sortable>Health</th>
-                <th data-sortable>Circuit Breaker</th>
-                <th data-sortable>Solver-сессии</th>
-                <th data-sortable>Sticky</th>
-                <th data-sortable>Посл. использование</th>
-                <th>URL ротации</th>
-                <th>Добавлен</th>
-                <th>Действия</th>
+                <th data-col="address">Адрес</th>
+                <th data-col="source">Источник</th>
+                <th data-col="type">Тип</th>
+                <th data-col="status">Статус</th>
+                <th data-col="health" data-sortable>Health</th>
+                <th data-col="cb" data-sortable>Circuit Breaker</th>
+                <th data-col="sessions" data-sortable>Solver-сессии</th>
+                <th data-col="sticky" data-sortable>Sticky</th>
+                <th data-col="last_used" data-sortable>Посл. использование</th>
+                <th data-col="rotation_url">URL ротации</th>
+                <th data-col="created">Добавлен</th>
+                <th data-col="actions">Действия</th>
             </tr>
         </thead>
         <tbody>
@@ -202,16 +218,16 @@
             {% set pid = adminProxyIds[proxy.id] | default('') %}
             {% set s = stats.perProxy[pid] | default({type: proxy.type|default('static'), health: 1.0, cbState: 'unknown', cbFailures: 0, stickySessions: 0, solverTotal: 0, solverSuccess: 0, solverError: 0, lastUsed: null}) %}
             <tr style="{{ not proxy.enabled ? 'opacity: 0.5;' : '' }}">
-                <td style="font-family: monospace; font-size: 13px;">{{ proxy.address }}</td>
-                <td><span class="badge" style="background: #8b5cf6;">admin</span></td>
-                <td>
+                <td data-col="address" style="font-family: monospace; font-size: 13px;">{{ proxy.address }}</td>
+                <td data-col="source"><span class="badge" style="background: #8b5cf6;">admin</span></td>
+                <td data-col="type">
                     {% if proxy.type == 'rotating' %}
                         <span style="font-size: 12px; color: #7c3aed;">ротационный</span>
                     {% else %}
                         <span style="font-size: 12px;">статический</span>
                     {% endif %}
                 </td>
-                <td>
+                <td data-col="status">
                     {% if proxy.enabled %}
                         <span class="badge badge-success">активен</span>
                     {% else %}
@@ -219,7 +235,7 @@
                     {% endif %}
                 </td>
                 {{ _self.proxyStatsRow(s) }}
-                <td class="rotation-url-cell">
+                <td data-col="rotation_url" class="rotation-url-cell">
                     {% if proxy.type == 'rotating' %}
                         <form method="post" action="{{ path('proxy_edit_rotation_url', {id: proxy.id}) }}">
                             <input type="text" name="rotation_url" value="{{ proxy.rotationUrl }}" placeholder="https://..." title="{{ proxy.rotationUrl ?? 'Не задан' }}">
@@ -229,8 +245,8 @@
                         <span style="color: #ccc;">—</span>
                     {% endif %}
                 </td>
-                <td>{{ proxy.createdAt|date('d.m.Y H:i') }}</td>
-                <td style="display: flex; gap: 6px;">
+                <td data-col="created">{{ proxy.createdAt|date('d.m.Y H:i') }}</td>
+                <td data-col="actions" style="display: flex; gap: 6px;">
                     <form method="post" action="{{ path('proxy_toggle', {id: proxy.id}) }}" style="display: inline;">
                         <button type="submit" style="padding: 4px 10px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 12px; background: {{ proxy.enabled ? '#fee2e2' : '#dcfce7' }}; color: {{ proxy.enabled ? '#991b1b' : '#166534' }};">
                             {{ proxy.enabled ? 'Отключить' : 'Включить' }}
@@ -249,16 +265,104 @@
 </div>
 
 <script>
-// Показываем поле rotation_url только для ротационного типа
-document.querySelectorAll('input[name="type"]').forEach(function(radio) {
-    radio.addEventListener('change', function() {
-        var row = document.getElementById('rotation-url-row');
-        if (this.value === 'rotating') {
-            row.classList.add('visible');
-        } else {
-            row.classList.remove('visible');
-        }
+(function() {
+    // Показываем поле rotation_url только для ротационного типа
+    document.querySelectorAll('input[name="type"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            var row = document.getElementById('rotation-url-row');
+            if (this.value === 'rotating') {
+                row.classList.add('visible');
+            } else {
+                row.classList.remove('visible');
+            }
+        });
     });
-});
+
+    // ─── Переключатель видимости колонок ───
+    var STORAGE_KEY = 'proxy_col_visibility';
+
+    // Человекочитаемые названия колонок
+    var COL_LABELS = {
+        address: 'Адрес', source: 'Источник', type: 'Тип', status: 'Статус',
+        health: 'Health', cb: 'Circuit Breaker', sessions: 'Solver-сессии',
+        sticky: 'Sticky', last_used: 'Посл. использование',
+        rotation_url: 'URL ротации', created: 'Добавлен', actions: 'Действия'
+    };
+
+    // Колонки, которые нельзя скрыть
+    var ALWAYS_VISIBLE = { address: true, actions: true };
+
+    function loadState() {
+        try {
+            var raw = localStorage.getItem(STORAGE_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch(e) { return null; }
+    }
+
+    function saveState(state) {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+    }
+
+    function applyVisibility(tableId, state) {
+        var table = document.getElementById(tableId);
+        if (!table) return;
+        var cells = table.querySelectorAll('th[data-col], td[data-col]');
+        cells.forEach(function(cell) {
+            var col = cell.getAttribute('data-col');
+            if (state[col] === false) {
+                cell.style.display = 'none';
+            } else {
+                cell.style.display = '';
+            }
+        });
+    }
+
+    function buildPanel(panelId, tableId, state) {
+        var panel = document.getElementById(panelId);
+        var table = document.getElementById(tableId);
+        if (!panel || !table) return;
+
+        // Собираем колонки из заголовков этой таблицы
+        var headers = table.querySelectorAll('thead th[data-col]');
+        panel.innerHTML = '';
+
+        headers.forEach(function(th) {
+            var col = th.getAttribute('data-col');
+            if (ALWAYS_VISIBLE[col]) return;
+
+            var label = document.createElement('label');
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = state[col] !== false;
+            cb.setAttribute('data-col', col);
+            cb.setAttribute('data-table', tableId);
+
+            cb.addEventListener('change', function() {
+                state[this.getAttribute('data-col')] = this.checked;
+                saveState(state);
+                applyVisibility(this.getAttribute('data-table'), state);
+            });
+
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(' ' + (COL_LABELS[col] || col)));
+            panel.appendChild(label);
+        });
+    }
+
+    // Кнопки открытия/закрытия панелей
+    document.querySelectorAll('.col-toggle-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var panel = document.getElementById(this.getAttribute('data-target'));
+            if (panel) panel.classList.toggle('open');
+        });
+    });
+
+    // Инициализация
+    var state = loadState() || {};
+    buildPanel('col-panel-env', 'table-env', state);
+    buildPanel('col-panel-admin', 'table-admin', state);
+    applyVisibility('table-env', state);
+    applyVisibility('table-admin', state);
+})();
 </script>
 {% endblock %}
