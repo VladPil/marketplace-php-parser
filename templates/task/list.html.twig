@@ -658,9 +658,13 @@
                 // Автовыбор последнего запуска
                 if (runs.length > 0) {
                     selectRun(runs[0].id);
+                    // Кнопка перезапуска только для завершённых/проваленных задач
+                    var latestStatus = runs[0].status;
+                    var terminalStatuses = ['completed_success', 'completed_empty', 'completed_partial', 'completed_skipped', 'failed', 'cancelled'];
+                    btnRerun.style.display = terminalStatuses.indexOf(latestStatus) !== -1 ? '' : 'none';
+                } else {
+                    btnRerun.style.display = 'none';
                 }
-                // Показываем кнопку перезапуска
-                btnRerun.style.display = '';
             })
             .catch(function() {
                 runTabsContainer.style.display = 'none';
@@ -669,8 +673,7 @@
     }
 
     function renderRunTabs(runs) {
-        if (runs.length <= 1) {
-            // Один запуск — не показываем вкладки, но выбираем run
+        if (runs.length === 0) {
             runTabsContainer.style.display = 'none';
             return;
         }
