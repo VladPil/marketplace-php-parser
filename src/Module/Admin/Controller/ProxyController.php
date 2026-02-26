@@ -72,6 +72,12 @@ final class ProxyController extends AbstractController
                 $type = 'static';
             }
             $proxy = new Proxy($address, 'admin', $type);
+
+            $rotationUrl = trim($request->request->getString('rotation_url', ''));
+            if ($rotationUrl !== '') {
+                $proxy->setRotationUrl($rotationUrl);
+            }
+
             $repo->save($proxy);
             $added++;
         }
@@ -122,6 +128,25 @@ final class ProxyController extends AbstractController
 
         $repo->remove($proxy);
         $this->addFlash('success', 'Прокси удалён');
+
+        return $this->redirectToRoute('proxy_list');
+    }
+
+    #[Route('/{id}/rotation-url', name: 'proxy_edit_rotation_url', methods: ['POST'])]
+    public function editRotationUrl(int $id, Request $request, ProxyRepository $repo): Response
+    {
+        $proxy = $repo->find($id);
+
+        if ($proxy === null) {
+            $this->addFlash('error', 'Прокси не найден');
+            return $this->redirectToRoute('proxy_list');
+        }
+
+        $rotationUrl = trim($request->request->getString('rotation_url', ''));
+        $proxy->setRotationUrl($rotationUrl !== '' ? $rotationUrl : null);
+        $repo->save($proxy);
+
+        $this->addFlash('success', $rotationUrl !== '' ? 'URL ротации сохранён' : 'URL ротации удалён');
 
         return $this->redirectToRoute('proxy_list');
     }

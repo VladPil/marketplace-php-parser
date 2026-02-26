@@ -21,6 +21,14 @@
 .sticky-count { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #ede9fe; color: #7c3aed; }
 .proxy-table th, .proxy-table td { vertical-align: middle; }
 .last-used-time { font-size: 12px; color: #888; white-space: nowrap; }
+.rotation-url-row { margin-top: 8px; display: none; }
+.rotation-url-row.visible { display: flex; }
+.rotation-url-input { flex: 1; padding: 6px 8px; font-family: monospace; font-size: 12px; border: 1px solid #ddd; border-radius: 4px; }
+.rotation-url-cell { max-width: 200px; }
+.rotation-url-cell form { display: flex; gap: 4px; align-items: center; }
+.rotation-url-cell input { width: 100%; padding: 3px 6px; font-family: monospace; font-size: 11px; border: 1px solid #ddd; border-radius: 3px; }
+.rotation-url-cell .btn-save-url { padding: 3px 8px; border: 1px solid #ddd; border-radius: 3px; cursor: pointer; font-size: 11px; background: #f0fdf4; color: #166534; white-space: nowrap; }
+.rotation-url-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 11px; background: #ede9fe; color: #7c3aed; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 {% endblock %}
 
 {% block content %}
@@ -59,6 +67,11 @@
             </label>
             <button type="submit" style="padding: 8px 20px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Добавить</button>
             <span style="font-size: 12px; color: #888;">По одному адресу на строку или через запятую (как в .env)</span>
+        </div>
+        <div class="rotation-url-row" id="rotation-url-row" style="margin-top: 8px; align-items: center; gap: 8px;">
+            <label style="font-size: 13px; white-space: nowrap;">URL ротации:</label>
+            <input type="text" name="rotation_url" class="rotation-url-input" placeholder="https://provider.com/api/rotate?key=xxx — HTTP GET для смены IP">
+            <span style="font-size: 12px; color: #888;">Провайдер переключит IP при HTTP GET на этот URL</span>
         </div>
     </form>
 </div>
@@ -179,6 +192,7 @@
                 <th data-sortable>Solver-сессии</th>
                 <th data-sortable>Sticky</th>
                 <th data-sortable>Посл. использование</th>
+                <th>URL ротации</th>
                 <th>Добавлен</th>
                 <th>Действия</th>
             </tr>
@@ -205,6 +219,16 @@
                     {% endif %}
                 </td>
                 {{ _self.proxyStatsRow(s) }}
+                <td class="rotation-url-cell">
+                    {% if proxy.type == 'rotating' %}
+                        <form method="post" action="{{ path('proxy_edit_rotation_url', {id: proxy.id}) }}">
+                            <input type="text" name="rotation_url" value="{{ proxy.rotationUrl }}" placeholder="https://..." title="{{ proxy.rotationUrl ?? 'Не задан' }}">
+                            <button type="submit" class="btn-save-url">💾</button>
+                        </form>
+                    {% else %}
+                        <span style="color: #ccc;">—</span>
+                    {% endif %}
+                </td>
                 <td>{{ proxy.createdAt|date('d.m.Y H:i') }}</td>
                 <td style="display: flex; gap: 6px;">
                     <form method="post" action="{{ path('proxy_toggle', {id: proxy.id}) }}" style="display: inline;">
@@ -223,4 +247,18 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+// Показываем поле rotation_url только для ротационного типа
+document.querySelectorAll('input[name="type"]').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+        var row = document.getElementById('rotation-url-row');
+        if (this.value === 'rotating') {
+            row.classList.add('visible');
+        } else {
+            row.classList.remove('visible');
+        }
+    });
+});
+</script>
 {% endblock %}
