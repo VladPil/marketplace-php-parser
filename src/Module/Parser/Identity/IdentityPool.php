@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Module\Parser\Identity;
 
-
 use App\Module\Parser\Proxy\ProxyProvider;
 use App\Module\Parser\Queue\RedisConnectionPool;
 use App\Shared\Contract\SolverClientInterface;

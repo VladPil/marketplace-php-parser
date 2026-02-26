@@ -49,22 +49,66 @@ class Proxy
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function getId(): ?int { return $this->id; }
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
 
-    public function getAddress(): string { return $this->address; }
-    public function setAddress(string $address): self { $this->address = $address; $this->updatedAt = new \DateTimeImmutable(); return $this; }
+    public function getAddress(): string
+    {
+        return $this->address;
+    }
+    public function setAddress(string $address): self
+    {
+        $this->address = $address;
+        $this->updatedAt = new \DateTimeImmutable();
+        return $this;
+    }
 
-    public function getSource(): string { return $this->source; }
+    public function getSource(): string
+    {
+        return $this->source;
+    }
 
-    public function getType(): string { return $this->type; }
-    public function setType(string $type): self { $this->type = $type; $this->updatedAt = new \DateTimeImmutable(); return $this; }
+    public function getType(): string
+    {
+        return $this->type;
+    }
+    public function setType(string $type): self
+    {
+        $this->type = $type;
+        $this->updatedAt = new \DateTimeImmutable();
+        return $this;
+    }
 
-    public function isEnabled(): bool { return $this->isEnabled; }
-    public function setEnabled(bool $enabled): self { $this->isEnabled = $enabled; $this->updatedAt = new \DateTimeImmutable(); return $this; }
+    public function isEnabled(): bool
+    {
+        return $this->isEnabled;
+    }
+    public function setEnabled(bool $enabled): self
+    {
+        $this->isEnabled = $enabled;
+        $this->updatedAt = new \DateTimeImmutable();
+        return $this;
+    }
 
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
 
-    public function getRotationUrl(): ?string { return $this->rotationUrl; }
-    public function setRotationUrl(?string $url): self { $this->rotationUrl = $url; $this->updatedAt = new \DateTimeImmutable(); return $this; }
+    public function getRotationUrl(): ?string
+    {
+        return $this->rotationUrl;
+    }
+    public function setRotationUrl(?string $url): self
+    {
+        $this->rotationUrl = $url;
+        $this->updatedAt = new \DateTimeImmutable();
+        return $this;
+    }
 }

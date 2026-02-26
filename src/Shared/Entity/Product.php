@@ -70,19 +70,64 @@ class Product extends BaseEntity
         $this->reviews = new ArrayCollection();
     }
 
-    public function getParseTaskId(): ?string { return $this->parseTaskId; }
-    public function getExternalId(): int { return $this->externalId; }
-    public function getCategory(): ?Category { return $this->category; }
-    public function getTitle(): string { return $this->title; }
-    public function getUrl(): ?string { return $this->url; }
-    public function getPrice(): ?string { return $this->price; }
-    public function getOriginalPrice(): ?string { return $this->originalPrice; }
-    public function getRating(): ?string { return $this->rating; }
-    public function getReviewCount(): ?int { return $this->reviewCount; }
-    public function getImageUrl(): ?string { return $this->imageUrl; }
-    public function getImageUrls(): array { return $this->imageUrls; }
-    public function getCharacteristics(): array { return $this->characteristics; }
-    public function getDescription(): ?string { return $this->description; }
-    public function getBrand(): ?string { return $this->brand; }
-    public function getReviews(): Collection { return $this->reviews; }
+    public function getParseTaskId(): ?string
+    {
+        return $this->parseTaskId;
+    }
+    public function getExternalId(): int
+    {
+        return $this->externalId;
+    }
+    public function getCategory(): ?Category
+    {
+        return $this->category;
+    }
+    public function getTitle(): string
+    {
+        return $this->title;
+    }
+    public function getUrl(): ?string
+    {
+        return $this->url;
+    }
+    public function getPrice(): ?string
+    {
+        return $this->price;
+    }
+    public function getOriginalPrice(): ?string
+    {
+        return $this->originalPrice;
+    }
+    public function getRating(): ?string
+    {
+        return $this->rating;
+    }
+    public function getReviewCount(): ?int
+    {
+        return $this->reviewCount;
+    }
+    public function getImageUrl(): ?string
+    {
+        return $this->imageUrl;
+    }
+    public function getImageUrls(): array
+    {
+        return $this->imageUrls;
+    }
+    public function getCharacteristics(): array
+    {
+        return $this->characteristics;
+    }
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+    public function getBrand(): ?string
+    {
+        return $this->brand;
+    }
+    public function getReviews(): Collection
+    {
+        return $this->reviews;
+    }
 }

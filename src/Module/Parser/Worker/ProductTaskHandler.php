@@ -245,7 +245,7 @@ final class ProductTaskHandler implements TaskHandlerInterface
         try {
             $dir = '/app/var/debug/products/' . $externalId . '_' . date('Ymd_His');
             if (!is_dir($dir)) {
-                mkdir($dir, 0775, true);
+                mkdir($dir, 0o775, true);
             }
 
             file_put_contents($dir . '/page1.html', $html);

@@ -75,7 +75,7 @@ final class OzonHeadersProvider implements HeadersProviderInterface
             ];
 
             // Убираем пустые значения заголовков
-            $headers = array_filter($headers, static fn (string $v): bool => $v !== '');
+            $headers = array_filter($headers, static fn(string $v): bool => $v !== '');
 
             // Client Hints из браузера или генерация из User-Agent
             $hints = $this->buildClientHints();

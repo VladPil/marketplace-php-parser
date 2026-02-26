@@ -40,11 +40,32 @@ class Image
         $this->createdAt = new \DateTimeImmutable();
     }
 
-    public function getId(): ?int { return $this->id; }
-    public function getEntityType(): string { return $this->entityType; }
-    public function getEntityId(): int { return $this->entityId; }
-    public function getUrl(): string { return $this->url; }
-    public function getParseTaskId(): ?string { return $this->parseTaskId; }
-    public function getSortOrder(): int { return $this->sortOrder; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
+    public function getEntityType(): string
+    {
+        return $this->entityType;
+    }
+    public function getEntityId(): int
+    {
+        return $this->entityId;
+    }
+    public function getUrl(): string
+    {
+        return $this->url;
+    }
+    public function getParseTaskId(): ?string
+    {
+        return $this->parseTaskId;
+    }
+    public function getSortOrder(): int
+    {
+        return $this->sortOrder;
+    }
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
 }

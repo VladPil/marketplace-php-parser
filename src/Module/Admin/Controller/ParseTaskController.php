@@ -197,7 +197,7 @@ final class ParseTaskController extends AbstractController
         }
 
         // Валидация: только UUID-подобные строки
-        $ids = array_filter($ids, static fn ($id) => is_string($id) && preg_match('/^[0-9a-f\-]{36}$/i', $id));
+        $ids = array_filter($ids, static fn($id) => is_string($id) && preg_match('/^[0-9a-f\-]{36}$/i', $id));
 
         $deleted = $service->deleteTasks($ids);
 
@@ -238,7 +238,7 @@ final class ParseTaskController extends AbstractController
             }
         }
 
-        $data = array_map(static fn ($log) => [
+        $data = array_map(static fn($log) => [
             'time' => $log->getCreatedAt()->setTimezone($msk)->format('d.m.Y H:i:s'),
             'level' => $log->getLevel(),
             'channel' => $log->getChannel(),
@@ -307,7 +307,7 @@ final class ParseTaskController extends AbstractController
             $reviews = array_merge($reviews, $reviewRepo->findByTaskId($taskId));
         }
 
-        $productsData = array_map(static fn ($p) => [
+        $productsData = array_map(static fn($p) => [
             'id' => $p->getId(),
             'externalId' => $p->getExternalId(),
             'title' => $p->getTitle(),
@@ -321,7 +321,7 @@ final class ParseTaskController extends AbstractController
             'characteristics' => $p->getCharacteristics(),
         ], $products);
 
-        $reviewsData = array_map(static fn ($r) => [
+        $reviewsData = array_map(static fn($r) => [
             'id' => $r->getId(),
             'productTitle' => $r->getProduct()->getTitle(),
             'author' => $r->getAuthor(),
@@ -358,7 +358,7 @@ final class ParseTaskController extends AbstractController
 
             // Формируем curl-команду для воспроизведения запроса
             $cookieString = implode('; ', array_map(
-                static fn (array $c) => $c['name'] . '=' . $c['value'],
+                static fn(array $c) => $c['name'] . '=' . $c['value'],
                 $cookies,
             ));
 

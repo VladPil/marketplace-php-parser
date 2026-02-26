@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Module\Parser\Marketplace;
 
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
-
 use App\Shared\Contract\CategoryExtractorInterface;
 use App\Shared\Contract\MarketplaceApiClientInterface;
 use App\Shared\Contract\ProductParserInterface;

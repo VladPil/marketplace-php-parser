@@ -83,7 +83,7 @@ final class ParseTaskService
         }
         $allCancelIds = [$taskId, ...array_map(fn($c) => $c->getId(), $childTasks)];
         $this->queueService->removeTasks($allCancelIds);
-            $this->em->flush();
+        $this->em->flush();
     }
 
     /**

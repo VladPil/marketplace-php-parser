@@ -52,12 +52,36 @@ class Category
         $this->products = new ArrayCollection();
     }
 
-    public function getExternalId(): int { return $this->externalId; }
-    public function getName(): string { return $this->name; }
-    public function getParent(): ?self { return $this->parent; }
-    public function getDepth(): int { return $this->depth; }
-    public function getPath(): ?string { return $this->path; }
-    public function getProductCount(): ?int { return $this->productCount; }
-    public function getParseTaskId(): ?string { return $this->parseTaskId; }
-    public function getProducts(): Collection { return $this->products; }
+    public function getExternalId(): int
+    {
+        return $this->externalId;
+    }
+    public function getName(): string
+    {
+        return $this->name;
+    }
+    public function getParent(): ?self
+    {
+        return $this->parent;
+    }
+    public function getDepth(): int
+    {
+        return $this->depth;
+    }
+    public function getPath(): ?string
+    {
+        return $this->path;
+    }
+    public function getProductCount(): ?int
+    {
+        return $this->productCount;
+    }
+    public function getParseTaskId(): ?string
+    {
+        return $this->parseTaskId;
+    }
+    public function getProducts(): Collection
+    {
+        return $this->products;
+    }
 }

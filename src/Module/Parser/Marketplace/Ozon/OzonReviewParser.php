@@ -93,9 +93,9 @@ final class OzonReviewParser implements ReviewParserInterface
         if ($publishedAt !== null) {
             try {
                 if (is_numeric($publishedAt)) {
-                    $date = (new \DateTimeImmutable('@' . $publishedAt))->format('Y-m-d H:i:s');
+                    $date = new \DateTimeImmutable('@' . $publishedAt)->format('Y-m-d H:i:s');
                 } else {
-                    $date = (new \DateTimeImmutable($publishedAt))->format('Y-m-d H:i:s');
+                    $date = new \DateTimeImmutable($publishedAt)->format('Y-m-d H:i:s');
                 }
             } catch (\Throwable) {
                 $date = null;
@@ -152,7 +152,7 @@ final class OzonReviewParser implements ReviewParserInterface
         $date = null;
         if (!empty($widget['date'])) {
             try {
-                $date = (new \DateTimeImmutable($widget['date']))->format('Y-m-d H:i:s');
+                $date = new \DateTimeImmutable($widget['date'])->format('Y-m-d H:i:s');
             } catch (\Throwable) {
                 $date = null;
             }

@@ -58,15 +58,48 @@ class Review
         $this->initCreatedAt();
     }
 
-    public function getParseTaskId(): ?string { return $this->parseTaskId; }
-    public function getProduct(): Product { return $this->product; }
-    public function getExternalReviewId(): string { return $this->externalReviewId; }
-    public function getAuthor(): ?string { return $this->author; }
-    public function getRating(): int { return $this->rating; }
-    public function getText(): ?string { return $this->text; }
-    public function getPros(): ?string { return $this->pros; }
-    public function getCons(): ?string { return $this->cons; }
-    public function getReviewDate(): ?\DateTimeImmutable { return $this->reviewDate; }
-    public function getImageUrls(): array { return $this->imageUrls; }
-    public function getFirstReply(): ?string { return $this->firstReply; }
+    public function getParseTaskId(): ?string
+    {
+        return $this->parseTaskId;
+    }
+    public function getProduct(): Product
+    {
+        return $this->product;
+    }
+    public function getExternalReviewId(): string
+    {
+        return $this->externalReviewId;
+    }
+    public function getAuthor(): ?string
+    {
+        return $this->author;
+    }
+    public function getRating(): int
+    {
+        return $this->rating;
+    }
+    public function getText(): ?string
+    {
+        return $this->text;
+    }
+    public function getPros(): ?string
+    {
+        return $this->pros;
+    }
+    public function getCons(): ?string
+    {
+        return $this->cons;
+    }
+    public function getReviewDate(): ?\DateTimeImmutable
+    {
+        return $this->reviewDate;
+    }
+    public function getImageUrls(): array
+    {
+        return $this->imageUrls;
+    }
+    public function getFirstReply(): ?string
+    {
+        return $this->firstReply;
+    }
 }

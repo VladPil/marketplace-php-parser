@@ -59,28 +59,83 @@ class SolverSession
         $this->createdAt = new \DateTimeImmutable();
     }
 
-    public function getId(): ?int { return $this->id; }
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
 
-    public function getParseTaskId(): ?string { return $this->parseTaskId; }
-    public function setParseTaskId(?string $parseTaskId): self { $this->parseTaskId = $parseTaskId; return $this; }
+    public function getParseTaskId(): ?string
+    {
+        return $this->parseTaskId;
+    }
+    public function setParseTaskId(?string $parseTaskId): self
+    {
+        $this->parseTaskId = $parseTaskId;
+        return $this;
+    }
 
-    public function getCookies(): array { return $this->cookies; }
-    public function setCookies(array $cookies): self { $this->cookies = $cookies; return $this; }
+    public function getCookies(): array
+    {
+        return $this->cookies;
+    }
+    public function setCookies(array $cookies): self
+    {
+        $this->cookies = $cookies;
+        return $this;
+    }
 
-    public function getUserAgent(): string { return $this->userAgent; }
-    public function setUserAgent(string $userAgent): self { $this->userAgent = $userAgent; return $this; }
+    public function getUserAgent(): string
+    {
+        return $this->userAgent;
+    }
+    public function setUserAgent(string $userAgent): self
+    {
+        $this->userAgent = $userAgent;
+        return $this;
+    }
 
-    public function getClientHints(): array { return $this->clientHints; }
-    public function setClientHints(array $clientHints): self { $this->clientHints = $clientHints; return $this; }
+    public function getClientHints(): array
+    {
+        return $this->clientHints;
+    }
+    public function setClientHints(array $clientHints): self
+    {
+        $this->clientHints = $clientHints;
+        return $this;
+    }
 
-    public function getProxy(): string { return $this->proxy; }
-    public function setProxy(string $proxy): self { $this->proxy = $proxy; return $this; }
+    public function getProxy(): string
+    {
+        return $this->proxy;
+    }
+    public function setProxy(string $proxy): self
+    {
+        $this->proxy = $proxy;
+        return $this;
+    }
 
-    public function getStatus(): string { return $this->status; }
-    public function setStatus(string $status): self { $this->status = $status; return $this; }
+    public function getStatus(): string
+    {
+        return $this->status;
+    }
+    public function setStatus(string $status): self
+    {
+        $this->status = $status;
+        return $this;
+    }
 
-    public function getErrorMessage(): ?string { return $this->errorMessage; }
-    public function setErrorMessage(?string $errorMessage): self { $this->errorMessage = $errorMessage; return $this; }
+    public function getErrorMessage(): ?string
+    {
+        return $this->errorMessage;
+    }
+    public function setErrorMessage(?string $errorMessage): self
+    {
+        $this->errorMessage = $errorMessage;
+        return $this;
+    }
 
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
 }

@@ -63,20 +63,73 @@ class ParseTask
         $this->initUpdatedAt();
     }
 
-    public function getId(): ?string { return $this->id; }
-    public function getType(): string { return $this->type; }
-    public function setType(string $type): self { $this->type = $type; return $this; }
-    public function getParams(): array { return $this->params; }
-    public function setParams(array $params): self { $this->params = $params; return $this; }
-    public function getStatus(): string { return $this->status; }
-    public function setStatus(string $status): self { $this->status = $status; return $this; }
-    public function getTotalItems(): ?int { return $this->totalItems; }
-    public function getParsedItems(): ?int { return $this->parsedItems; }
-    public function getErrorMessage(): ?string { return $this->errorMessage; }
-    public function getBatchId(): ?string { return $this->batchId; }
-    public function setBatchId(?string $batchId): self { $this->batchId = $batchId; return $this; }
-    public function getParentTaskId(): ?string { return $this->parentTaskId; }
-    public function setParentTaskId(?string $parentTaskId): self { $this->parentTaskId = $parentTaskId; return $this; }
-    public function getStartedAt(): ?\DateTimeImmutable { return $this->startedAt; }
-    public function getCompletedAt(): ?\DateTimeImmutable { return $this->completedAt; }
+    public function getId(): ?string
+    {
+        return $this->id;
+    }
+    public function getType(): string
+    {
+        return $this->type;
+    }
+    public function setType(string $type): self
+    {
+        $this->type = $type;
+        return $this;
+    }
+    public function getParams(): array
+    {
+        return $this->params;
+    }
+    public function setParams(array $params): self
+    {
+        $this->params = $params;
+        return $this;
+    }
+    public function getStatus(): string
+    {
+        return $this->status;
+    }
+    public function setStatus(string $status): self
+    {
+        $this->status = $status;
+        return $this;
+    }
+    public function getTotalItems(): ?int
+    {
+        return $this->totalItems;
+    }
+    public function getParsedItems(): ?int
+    {
+        return $this->parsedItems;
+    }
+    public function getErrorMessage(): ?string
+    {
+        return $this->errorMessage;
+    }
+    public function getBatchId(): ?string
+    {
+        return $this->batchId;
+    }
+    public function setBatchId(?string $batchId): self
+    {
+        $this->batchId = $batchId;
+        return $this;
+    }
+    public function getParentTaskId(): ?string
+    {
+        return $this->parentTaskId;
+    }
+    public function setParentTaskId(?string $parentTaskId): self
+    {
+        $this->parentTaskId = $parentTaskId;
+        return $this;
+    }
+    public function getStartedAt(): ?\DateTimeImmutable
+    {
+        return $this->startedAt;
+    }
+    public function getCompletedAt(): ?\DateTimeImmutable
+    {
+        return $this->completedAt;
+    }
 }

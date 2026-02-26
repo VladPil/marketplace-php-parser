@@ -66,12 +66,12 @@ final class CreateParseTaskRequest extends AbstractRequest
     private static function periodToDate(string $period): string
     {
         return match ($period) {
-            '1w' => (new \DateTimeImmutable('-1 week'))->format('Y-m-d'),
-            '1m' => (new \DateTimeImmutable('-1 month'))->format('Y-m-d'),
-            '3m' => (new \DateTimeImmutable('-3 months'))->format('Y-m-d'),
-            '6m' => (new \DateTimeImmutable('-6 months'))->format('Y-m-d'),
-            '1y' => (new \DateTimeImmutable('-1 year'))->format('Y-m-d'),
-            default => (new \DateTimeImmutable('-1 month'))->format('Y-m-d'),
+            '1w' => new \DateTimeImmutable('-1 week')->format('Y-m-d'),
+            '1m' => new \DateTimeImmutable('-1 month')->format('Y-m-d'),
+            '3m' => new \DateTimeImmutable('-3 months')->format('Y-m-d'),
+            '6m' => new \DateTimeImmutable('-6 months')->format('Y-m-d'),
+            '1y' => new \DateTimeImmutable('-1 year')->format('Y-m-d'),
+            default => new \DateTimeImmutable('-1 month')->format('Y-m-d'),
         };
     }
 }
