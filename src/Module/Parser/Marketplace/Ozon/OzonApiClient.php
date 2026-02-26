@@ -8,6 +8,7 @@ use App\Module\Parser\Config\HttpConfig;
 use App\Module\Parser\Config\RetryConfig;
 use App\Module\Parser\Identity\Identity;
 use App\Module\Parser\Identity\IdentityBlockedException;
+use App\Module\Parser\Identity\IdentityPoolConfig;
 use App\Module\Parser\Proxy\ProxyRotatorInterface;
 use App\Module\Parser\Proxy\ProxySelection;
 use App\Shared\Contract\MarketplaceApiClientInterface;
@@ -46,6 +47,7 @@ final class OzonApiClient implements MarketplaceApiClientInterface
         private readonly SolverClientInterface $solverClient,
         private readonly ParseLogger $logger,
         private readonly ProxyRotatorInterface $proxyRotator,
+        private readonly IdentityPoolConfig $identityPoolConfig,
     ) {
         $this->client = $this->createClient();
     }
@@ -74,6 +76,25 @@ final class OzonApiClient implements MarketplaceApiClientInterface
 
     private function fetchPageWithIdentity(string $path, array $queryParams, Identity $identity): array
     {
+        // Проверяем перегрев identity (N подряд Guzzle 403 → ротация)
+        if ($identity->isOverheated($this->identityPoolConfig->guzzle403Threshold)) {
+            $this->logger->warning(
+                sprintf(
+                    'Identity %s перегрета (%d подряд 403, порог %d) — принудительная ротация',
+                    substr($identity->id, 0, 8),
+                    $identity->getGuzzle403Count(),
+                    $this->identityPoolConfig->guzzle403Threshold,
+                ),
+                ['channel' => 'api'],
+            );
+            throw new IdentityBlockedException(sprintf(
+                'Identity %s перегрета: %d подряд 403 (порог %d)',
+                substr($identity->id, 0, 8),
+                $identity->getGuzzle403Count(),
+                $this->identityPoolConfig->guzzle403Threshold,
+            ));
+        }
+
         $proxy = $identity->proxyAddress;
         $session = $identity->getSession();
 
@@ -84,17 +105,29 @@ final class OzonApiClient implements MarketplaceApiClientInterface
 
                 if ($status !== Response::HTTP_FORBIDDEN) {
                     $body = $response->getBody()->getContents();
+                    $identity->resetGuzzle403();
                     $this->logger->info(
                         sprintf('Guzzle ответ: HTTP %d, размер=%d байт (identity %s)', $status, strlen($body), substr($identity->id, 0, 8)),
                         ['channel' => 'api'],
                     );
+                    $this->sleepRequestDelay();
                     return json_decode($body, true) ?? [];
                 }
 
+                // Guzzle 403 — инкрементируем счётчик
+                $identity->incrementGuzzle403();
                 $this->logger->warning(
-                    sprintf('Guzzle 403 на %s (identity %s) — пробуем browser fetch', $path, substr($identity->id, 0, 8)),
+                    sprintf(
+                        'Guzzle 403 на %s (identity %s, серия 403: %d/%d) — пробуем browser fetch',
+                        $path,
+                        substr($identity->id, 0, 8),
+                        $identity->getGuzzle403Count(),
+                        $this->identityPoolConfig->guzzle403Threshold,
+                    ),
                     ['channel' => 'api'],
                 );
+            } catch (IdentityBlockedException $e) {
+                throw $e;
             } catch (\Throwable $e) {
                 $this->logger->warning(
                     sprintf('Guzzle exception на %s (identity %s): %s — browser fetch', $path, substr($identity->id, 0, 8), $e->getMessage()),
@@ -119,6 +152,7 @@ final class OzonApiClient implements MarketplaceApiClientInterface
             $identity->updateSession($fetchSession);
         }
 
+        $this->sleepRequestDelay();
         unset($fetchResult['_session']);
         return $fetchResult;
     }
@@ -617,6 +651,26 @@ final class OzonApiClient implements MarketplaceApiClientInterface
         $auth = isset($parsed['user']) ? '***@' : '';
 
         return $scheme . $auth . $host . $port;
+    }
+
+    /**
+     * Задержка между API-запросами для предотвращения rate limiting.
+     * Swoole-совместимый sleep (корутина не блокирует event loop).
+     */
+    private function sleepRequestDelay(): void
+    {
+        $delayMs = $this->identityPoolConfig->requestDelayMs;
+        if ($delayMs <= 0) {
+            return;
+        }
+
+        $seconds = $delayMs / 1000;
+
+        if (extension_loaded('swoole') && \Swoole\Coroutine::getCid() > 0) {
+            \Swoole\Coroutine::sleep($seconds);
+        } else {
+            usleep((int) ($seconds * 1_000_000));
+        }
     }
 
 }

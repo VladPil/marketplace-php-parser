@@ -66,7 +66,7 @@ services:
             $rateLimit: '%env(int:default::PARSER_RATE_LIMIT)%'
             $workers: '%env(int:default::PARSER_WORKERS)%'
             $healthPort: 9501
-            $maxReviewPages: 500
+            $maxReviewPages: 100
             $maxTaskTimeoutSeconds: '%env(int:default::PARSER_MAX_TASK_TIMEOUT)%'
 
     App\Module\Parser\Proxy\Config\ProxyRotationConfig:
@@ -83,6 +83,8 @@ services:
             $sanitizerIntervalSeconds: '%env(int:default::IDENTITY_SANITIZER_INTERVAL)%'
             $maxIdentityRetries: '%env(int:default::IDENTITY_MAX_RETRIES)%'
             $warmupUrl: '%env(default::IDENTITY_WARMUP_URL)%'
+            $requestDelayMs: '%env(int:default::IDENTITY_REQUEST_DELAY_MS)%'
+            $guzzle403Threshold: '%env(int:default::IDENTITY_GUZZLE_403_THRESHOLD)%'
 
     # --- Логирование ---
 
@@ -237,5 +239,7 @@ parameters:
     env(IDENTITY_TTL): '1200'
     env(IDENTITY_WARMER_INTERVAL): '30'
     env(IDENTITY_SANITIZER_INTERVAL): '5'
-    env(IDENTITY_MAX_RETRIES): '2'
+    env(IDENTITY_MAX_RETRIES): '5'
     env(IDENTITY_WARMUP_URL): 'https://www.ozon.ru/product/balaklava-turn-off-on-new-965672325/'
+    env(IDENTITY_REQUEST_DELAY_MS): '300'
+    env(IDENTITY_GUZZLE_403_THRESHOLD): '3'

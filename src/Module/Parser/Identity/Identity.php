@@ -42,6 +42,11 @@ final class Identity
         private ?float $claimedAt = null,
     ) {}
 
+    /**
+     * Счётчик подряд идущих Guzzle 403 (runtime-only, НЕ сериализуется в Redis).
+     * Используется для детекции rate limiting и ротации identity.
+     */
+    private int $guzzle403Count = 0;
 
 
     public function getSession(): ?SessionData
@@ -102,6 +107,38 @@ final class Identity
         $this->status = self::STATUS_QUARANTINE;
         $this->claimedBy = null;
         $this->claimedAt = null;
+    }
+
+    /**
+     * Инкрементирует счётчик подряд идущих Guzzle 403.
+     */
+    public function incrementGuzzle403(): void
+    {
+        $this->guzzle403Count++;
+    }
+
+    /**
+     * Сбрасывает счётчик Guzzle 403 (успешный запрос прервал серию).
+     */
+    public function resetGuzzle403(): void
+    {
+        $this->guzzle403Count = 0;
+    }
+
+    /**
+     * Проверяет, превышен ли порог последовательных 403 (identity «перегрета»).
+     */
+    public function isOverheated(int $threshold): bool
+    {
+        return $this->guzzle403Count >= $threshold;
+    }
+
+    /**
+     * Текущее значение счётчика 403 (для логирования).
+     */
+    public function getGuzzle403Count(): int
+    {
+        return $this->guzzle403Count;
     }
 
 
@@ -193,11 +230,14 @@ final class Identity
     {
         return sprintf(
             '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
             mt_rand(0, 0xffff),
             mt_rand(0, 0x0fff) | 0x4000,
             mt_rand(0, 0x3fff) | 0x8000,
-            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
         );
     }
 }

@@ -20,5 +20,9 @@ final readonly class IdentityPoolConfig
         public int $maxIdentityRetries = 2,
         /** URL для прогрева identity (страница с полным набором cookies) */
         public string $warmupUrl = 'https://www.ozon.ru/product/balaklava-turn-off-on-new-965672325/',
+        /** Задержка между API-запросами в миллисекундах (защита от rate limiting) */
+        public int $requestDelayMs = 300,
+        /** Порог последовательных Guzzle 403 для ротации identity */
+        public int $guzzle403Threshold = 3,
     ) {}
 }
