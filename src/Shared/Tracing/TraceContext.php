@@ -23,11 +23,13 @@ final class TraceContext
     private const KEY_TRACE_ID = '_trace_id';
     private const KEY_TASK_ID = '_task_id';
     private const KEY_IDENTITY = '_identity';
+    private const KEY_RUN_ID = '_run_id';
 
     // Fallback для работы вне корутин (admin, CLI)
     private static ?string $traceId = null;
     private static ?string $taskId = null;
     private static ?Identity $identity = null;
+    private static ?string $runId = null;
 
     /**
      * Проверяет, работаем ли мы внутри Swoole-корутины.
@@ -96,15 +98,31 @@ final class TraceContext
     }
 
     /**
+     * Возвращает идентификатор текущего запуска задачи.
+     */
+    public static function getRunId(): ?string
+    {
+        return self::get(self::KEY_RUN_ID);
+    }
+
+    /**
+     * Привязывает контекст к конкретному запуску задачи.
+     */
+    public static function setRunId(?string $runId): void
+    {
+        self::set(self::KEY_RUN_ID, $runId);
+    }
+
+    /**
      * Сбрасывает контекст трассировки (при завершении задачи).
      */
     public static function reset(): void
     {
         self::set(self::KEY_TRACE_ID, null);
         self::set(self::KEY_TASK_ID, null);
+        self::set(self::KEY_RUN_ID, null);
         self::set(self::KEY_IDENTITY, null);
     }
-
     /**
      * Копирует контекст текущей корутины в дочернюю.
      *
@@ -128,7 +146,7 @@ final class TraceContext
         }
 
         $ctx = Coroutine::getContext();
-        foreach ([self::KEY_TRACE_ID, self::KEY_TASK_ID, self::KEY_IDENTITY] as $key) {
+        foreach ([self::KEY_TRACE_ID, self::KEY_TASK_ID, self::KEY_RUN_ID, self::KEY_IDENTITY] as $key) {
             if (isset($parentCtx[$key])) {
                 $ctx[$key] = $parentCtx[$key];
             }
@@ -149,6 +167,7 @@ final class TraceContext
         match ($key) {
             self::KEY_TRACE_ID => self::$traceId = $value,
             self::KEY_TASK_ID => self::$taskId = $value,
+            self::KEY_RUN_ID => self::$runId = $value,
             self::KEY_IDENTITY => self::$identity = $value,
         };
     }
@@ -166,6 +185,7 @@ final class TraceContext
         return match ($key) {
             self::KEY_TRACE_ID => self::$traceId,
             self::KEY_TASK_ID => self::$taskId,
+            self::KEY_RUN_ID => self::$runId,
             self::KEY_IDENTITY => self::$identity,
             default => null,
         };

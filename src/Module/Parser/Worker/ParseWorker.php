@@ -37,7 +37,8 @@ final class ParseWorker
         private readonly TaskHandlerRegistry $handlerRegistry,
         private readonly ParseLogger $logger,
         private readonly ParserConfig $config,
-    ) {}
+    ) {
+    }
 
     /**
      * Запускает бесконечный цикл потребления задач из очереди.
@@ -91,14 +92,20 @@ final class ParseWorker
             }
 
             try {
+                // Создаём запуск (run) для задачи
+                $runId = $this->taskStorage->createRun($taskId);
+                TraceContext::setRunId($runId);
+
+                $this->taskStorage->updateRunStatus($runId, 'running');
                 $this->taskStorage->updateTaskStatus($taskId, 'running');
                 $handler = $this->handlerRegistry->getHandler($taskType);
 
-                $this->logger->info(sprintf('Запуск обработчика: %s', get_class($handler)));
+                $this->logger->info(sprintf('Запуск обработчика: %s (run: %s)', get_class($handler), substr($runId, 0, 8)));
 
                 $result = $this->executeWithTimeout($handler, $taskId, $task['params'] ?? []);
 
                 $status = $result->resolveStatus();
+                $this->taskStorage->updateRunStatus($runId, $status, null, $result->parsedItems);
                 $this->taskStorage->updateTaskProgress($taskId, $result->parsedItems, $result->parsedItems);
                 $this->taskStorage->updateTaskStatus($taskId, $status);
                 $this->logger->info(sprintf('Задача завершена: %s (элементов: %d, ошибок: %d)', $status, $result->parsedItems, $result->errorCount));
@@ -109,6 +116,9 @@ final class ParseWorker
                     sprintf('Ошибка выполнения задачи: %s', $e->getMessage()),
                     ['exception' => $e::class, 'file' => $e->getFile(), 'line' => $e->getLine()],
                 );
+                if (isset($runId)) {
+                    $this->taskStorage->updateRunStatus($runId, 'failed', $e->getMessage());
+                }
                 $this->taskStorage->updateTaskStatus($taskId, 'failed', $e->getMessage());
 
                 $this->handleParentActivation($taskId, 'failed');

@@ -13,6 +13,7 @@ use App\Shared\Repository\ParseTaskRepository;
 use App\Shared\Repository\ProductRepository;
 use App\Shared\Repository\ReviewRepository;
 use App\Shared\Repository\SolverSessionRepository;
+use App\Shared\Repository\TaskRunRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -197,7 +198,7 @@ final class ParseTaskController extends AbstractController
         }
 
         // Валидация: только UUID-подобные строки
-        $ids = array_filter($ids, static fn($id) => is_string($id) && preg_match('/^[0-9a-f\-]{36}$/i', $id));
+        $ids = array_filter($ids, static fn ($id) => is_string($id) && preg_match('/^[0-9a-f\-]{36}$/i', $id));
 
         $deleted = $service->deleteTasks($ids);
 
@@ -214,14 +215,59 @@ final class ParseTaskController extends AbstractController
      * Возвращает логи задачи в формате JSON для модального окна.
      */
     #[Route('/{id}/logs', name: 'task_logs_json')]
-    public function logsJson(string $id, ParseLogRepository $logRepo, ParseTaskRepository $taskRepo): JsonResponse
+    public function logsJson(string $id, Request $request, ParseLogRepository $logRepo, ParseTaskRepository $taskRepo, TaskRunRepository $runRepo): JsonResponse
     {
+        $runId = $request->query->get('run_id');
+
+        // Если run_id указан — логи конкретного запуска
+        if ($runId !== null && $runId !== '') {
+            $logs = $logRepo->findByRunId($runId);
+            $run = $runRepo->find($runId);
+
+            $msk = new \DateTimeZone('Europe/Moscow');
+
+            $duration = null;
+            $durationFormatted = null;
+            if ($run !== null) {
+                $startedAt = $run->getStartedAt();
+                $finishedAt = $run->getFinishedAt();
+
+                if ($startedAt !== null && $finishedAt !== null) {
+                    $duration = $finishedAt->getTimestamp() - $startedAt->getTimestamp();
+                    $durationFormatted = $this->formatDuration($duration);
+                } elseif ($startedAt !== null) {
+                    $duration = time() - $startedAt->getTimestamp();
+                    $durationFormatted = $this->formatDuration($duration) . ' (выполняется)';
+                }
+            }
+
+            $data = array_map(static fn ($log) => [
+                'time' => $log->getCreatedAt()->setTimezone($msk)->format('d.m.Y H:i:s'),
+                'level' => $log->getLevel(),
+                'channel' => $log->getChannel(),
+                'traceId' => $log->getTraceId(),
+                'message' => $log->getMessage(),
+                'context' => $log->getContext(),
+            ], $logs);
+
+            return new JsonResponse([
+                'logs' => $data,
+                'taskMeta' => [
+                    'startedAt' => $run?->getStartedAt()?->setTimezone($msk)->format('d.m.Y H:i:s'),
+                    'completedAt' => $run?->getFinishedAt()?->setTimezone($msk)->format('d.m.Y H:i:s'),
+                    'duration' => $duration,
+                    'durationFormatted' => $durationFormatted,
+                    'status' => $run?->getStatus(),
+                ],
+            ]);
+        }
+
+        // Фоллбэк: все логи задачи (без фильтрации по запуску)
         $logs = $logRepo->findByTaskId($id);
         $task = $taskRepo->find($id);
 
         $msk = new \DateTimeZone('Europe/Moscow');
 
-        // Вычисляем время выполнения задачи
         $duration = null;
         $durationFormatted = null;
         if ($task !== null) {
@@ -232,13 +278,12 @@ final class ParseTaskController extends AbstractController
                 $duration = $completedAt->getTimestamp() - $startedAt->getTimestamp();
                 $durationFormatted = $this->formatDuration($duration);
             } elseif ($startedAt !== null) {
-                // Задача ещё выполняется — считаем от старта до текущего момента
                 $duration = time() - $startedAt->getTimestamp();
                 $durationFormatted = $this->formatDuration($duration) . ' (выполняется)';
             }
         }
 
-        $data = array_map(static fn($log) => [
+        $data = array_map(static fn ($log) => [
             'time' => $log->getCreatedAt()->setTimezone($msk)->format('d.m.Y H:i:s'),
             'level' => $log->getLevel(),
             'channel' => $log->getChannel(),
@@ -307,7 +352,7 @@ final class ParseTaskController extends AbstractController
             $reviews = array_merge($reviews, $reviewRepo->findByTaskId($taskId));
         }
 
-        $productsData = array_map(static fn($p) => [
+        $productsData = array_map(static fn ($p) => [
             'id' => $p->getId(),
             'externalId' => $p->getExternalId(),
             'title' => $p->getTitle(),
@@ -321,7 +366,7 @@ final class ParseTaskController extends AbstractController
             'characteristics' => $p->getCharacteristics(),
         ], $products);
 
-        $reviewsData = array_map(static fn($r) => [
+        $reviewsData = array_map(static fn ($r) => [
             'id' => $r->getId(),
             'productTitle' => $r->getProduct()->getTitle(),
             'author' => $r->getAuthor(),
@@ -358,7 +403,7 @@ final class ParseTaskController extends AbstractController
 
             // Формируем curl-команду для воспроизведения запроса
             $cookieString = implode('; ', array_map(
-                static fn(array $c) => $c['name'] . '=' . $c['value'],
+                static fn (array $c) => $c['name'] . '=' . $c['value'],
                 $cookies,
             ));
 
@@ -387,5 +432,47 @@ final class ParseTaskController extends AbstractController
         }, $sessions);
 
         return new JsonResponse($data);
+    }
+
+    /**
+     * Возвращает список запусков задачи (последние 5).
+     */
+    #[Route('/{id}/runs', name: 'task_runs_json')]
+    public function runsJson(string $id, TaskRunRepository $runRepo): JsonResponse
+    {
+        $runs = $runRepo->findByTaskId($id, 5);
+        $msk = new \DateTimeZone('Europe/Moscow');
+
+        $data = array_map(static fn ($run) => [
+            'id' => $run->getId(),
+            'runNumber' => $run->getRunNumber(),
+            'status' => $run->getStatus(),
+            'startedAt' => $run->getStartedAt()?->setTimezone($msk)->format('d.m.Y H:i:s'),
+            'finishedAt' => $run->getFinishedAt()?->setTimezone($msk)->format('d.m.Y H:i:s'),
+            'parsedItems' => $run->getParsedItems(),
+            'error' => $run->getError(),
+            'identityId' => $run->getIdentityId() ? substr($run->getIdentityId(), 0, 8) : null,
+            'createdAt' => $run->getCreatedAt()->setTimezone($msk)->format('d.m.Y H:i:s'),
+        ], $runs);
+
+        return new JsonResponse($data);
+    }
+
+    /**
+     * Перезапускает задачу (создаёт новый запуск и публикует в очередь).
+     */
+    #[Route('/{id}/rerun', name: 'task_rerun', methods: ['POST'])]
+    public function rerun(string $id, ParseTaskService $service): JsonResponse
+    {
+        $result = $service->rerunTask($id);
+
+        if ($result === null) {
+            return new JsonResponse(['error' => 'Задача не найдена'], Response::HTTP_NOT_FOUND);
+        }
+
+        return new JsonResponse([
+            'success' => true,
+            'message' => 'Задача перезапущена',
+        ]);
     }
 }

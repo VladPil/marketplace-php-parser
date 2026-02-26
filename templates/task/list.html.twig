@@ -84,6 +84,24 @@
     .batch-toggle { display: inline-block; transition: transform 0.2s; margin-right: 6px; font-size: 12px; }
     .batch-toggle.collapsed { transform: rotate(-90deg); }
     .batch-task-row.hidden { display: none; }
+
+    /* Вкладки запусков */
+    .run-tabs { display: flex; gap: 6px; padding: 10px 20px; background: #f8fafc; border-bottom: 1px solid #e5e7eb; flex-wrap: wrap; align-items: center; }
+    .run-tab { padding: 5px 12px; cursor: pointer; border: 1px solid #d1d5db; background: #fff; border-radius: 4px; font-size: 12px; color: #6b7280; transition: all 0.2s; }
+    .run-tab:hover { border-color: #93c5fd; color: #2563eb; }
+    .run-tab.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .run-tab .run-status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+    .run-tab .run-status.success { background: #22c55e; }
+    .run-tab .run-status.error { background: #ef4444; }
+    .run-tab .run-status.running { background: #3b82f6; animation: pulse 1.5s infinite; }
+    .run-tab .run-status.pending { background: #9ca3af; }
+    .run-tab .run-status.warning { background: #f59e0b; }
+    .run-tab .run-status.skipped { background: #8b5cf6; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .btn-rerun { padding: 6px 14px; background: #f59e0b; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500; margin-right: 12px; }
+    .btn-rerun:hover { background: #d97706; }
+    .btn-rerun:disabled { opacity: 0.5; cursor: not-allowed; }
+    .run-tabs-label { font-size: 12px; color: #9ca3af; margin-right: 4px; }
 {% endblock %}
 
 {% block content %}
@@ -310,12 +328,16 @@
     <div class="log-modal">
         <div class="log-modal-header">
             <h3 id="logModalTitle">Задача</h3>
-            <button class="log-modal-close" id="logModalClose">&times;</button>
+            <div style="display: flex; align-items: center;">
+                <button class="btn-rerun" id="btnRerun" style="display: none;">↻ Перезапустить</button>
+                <button class="log-modal-close" id="logModalClose">&times;</button>
+            </div>
         </div>
         <div class="modal-tabs">
             <button class="modal-tab active" data-tab="logs">Логи</button>
             <button class="modal-tab" data-tab="results">Результаты</button>
         </div>
+        <div class="run-tabs" id="runTabs" style="display: none;"></div>
         <div class="log-modal-body" id="logModalBody">
         </div>
     </div>
@@ -336,6 +358,16 @@
     var MODAL_REFRESH = 3000;
     var TABLE_REFRESH = 5000;
 
+    // === Запуски (runs) ===
+    var runTabsContainer = document.getElementById('runTabs');
+    var btnRerun = document.getElementById('btnRerun');
+    var currentRunId = null;
+    var currentRuns = [];
+    var statusBadgeMap = {
+        'completed_success': 'success', 'completed_empty': 'warning', 'completed_skipped': 'skipped',
+        'completed_partial': 'warning', 'failed': 'error', 'running': 'running', 'pending': 'pending',
+        'paused': 'pending', 'cancelled': 'error'
+    };
     // === Массовые действия ===
     var bulkBar = document.getElementById('bulkBar');
     var bulkCount = document.getElementById('bulkCount');
@@ -522,7 +554,26 @@
         if (activeTab === 'results') {
             silentLoadResults(currentTaskId);
         } else {
-            silentLoadLogs(currentTaskId);
+            silentLoadLogs(currentTaskId, currentRunId);
+        }
+        // Обновляем вкладки запусков (мог появиться новый run)
+        if (currentTaskId) {
+            fetch('/tasks/' + currentTaskId + '/runs')
+                .then(function(r) { return r.json(); })
+                .then(function(runs) {
+                    if (runs.length !== currentRuns.length) {
+                        currentRuns = runs;
+                        renderRunTabs(runs);
+                        if (!currentRunId && runs.length > 0) {
+                            selectRun(runs[0].id);
+                        }
+                    } else {
+                        // Обновляем статусы вкладок
+                        currentRuns = runs;
+                        renderRunTabs(runs);
+                    }
+                })
+                .catch(function() {});
         }
     }
 
@@ -574,8 +625,11 @@
     // === Модальное окно ===
     function openModal(taskId) {
         currentTaskId = taskId;
+        currentRunId = null;
+        currentRuns = [];
         title.textContent = 'Задача ' + taskId;
         overlay.classList.add('active');
+        loadRuns(taskId);
         setActiveTab('logs');
         startAutoRefresh();
     }
@@ -587,10 +641,97 @@
         });
         if (tab === 'results') {
             loadResults(currentTaskId);
+        } else if (currentRunId) {
+            loadLogs(currentTaskId, currentRunId);
         } else {
             loadLogs(currentTaskId);
         }
     }
+
+    // === Запуски (runs) ===
+    function loadRuns(taskId) {
+        fetch('/tasks/' + taskId + '/runs')
+            .then(function(r) { return r.json(); })
+            .then(function(runs) {
+                currentRuns = runs;
+                renderRunTabs(runs);
+                // Автовыбор последнего запуска
+                if (runs.length > 0) {
+                    selectRun(runs[0].id);
+                }
+                // Показываем кнопку перезапуска
+                btnRerun.style.display = '';
+            })
+            .catch(function() {
+                runTabsContainer.style.display = 'none';
+                btnRerun.style.display = 'none';
+            });
+    }
+
+    function renderRunTabs(runs) {
+        if (runs.length <= 1) {
+            // Один запуск — не показываем вкладки, но выбираем run
+            runTabsContainer.style.display = 'none';
+            return;
+        }
+        runTabsContainer.style.display = 'flex';
+        var html = '<span class="run-tabs-label">Запуски:</span>';
+        // runs приходят в DESC порядке, показываем в ASC
+        var sorted = runs.slice().reverse();
+        sorted.forEach(function(run) {
+            var badge = statusBadgeMap[run.status] || 'pending';
+            var isActive = run.id === currentRunId ? ' active' : '';
+            html += '<button class="run-tab' + isActive + '" data-run-id="' + run.id + '">';
+            html += '<span class="run-status ' + badge + '"></span>';
+            html += '#' + run.runNumber;
+            html += '</button>';
+        });
+        runTabsContainer.innerHTML = html;
+        // Биндим клики
+        runTabsContainer.querySelectorAll('.run-tab').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                selectRun(btn.dataset.runId);
+            });
+        });
+    }
+
+    function selectRun(runId) {
+        currentRunId = runId;
+        // Обновляем активные вкладки
+        runTabsContainer.querySelectorAll('.run-tab').forEach(function(btn) {
+            btn.classList.toggle('active', btn.dataset.runId === runId);
+        });
+        // Перезагружаем логи для выбранного запуска
+        if (activeTab === 'logs') {
+            loadLogs(currentTaskId, runId);
+        }
+    }
+
+    function rerunTask() {
+        if (!currentTaskId) return;
+        btnRerun.disabled = true;
+        btnRerun.textContent = 'Перезапуск...';
+        fetch('/tasks/' + currentTaskId + '/rerun', { method: 'POST' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                btnRerun.disabled = false;
+                btnRerun.textContent = '\u21bb Перезапустить';
+                if (data.success) {
+                    // Перезагружаем запуски через 1 сек (run создаётся воркером)
+                    setTimeout(function() { loadRuns(currentTaskId); }, 1500);
+                    refreshTableRows();
+                } else {
+                    alert(data.error || 'Ошибка перезапуска');
+                }
+            })
+            .catch(function() {
+                btnRerun.disabled = false;
+                btnRerun.textContent = '\u21bb Перезапустить';
+                alert('Ошибка перезапуска');
+            });
+    }
+
+    btnRerun.addEventListener('click', rerunTask);
 
     function renderResults(data) {
         var products = data.products || [];
@@ -917,10 +1058,12 @@
             });
     }
 
-    function loadLogs(taskId) {
+    function loadLogs(taskId, runId) {
         body.innerHTML = '<div class="log-loading">Загрузка\u2026</div>';
         body.dataset.logsMarker = '';
-        fetch('/tasks/' + taskId + '/logs')
+        var url = '/tasks/' + taskId + '/logs';
+        if (runId) url += '?run_id=' + runId;
+        fetch(url)
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 var logs = data.logs || data;
@@ -940,11 +1083,15 @@
     function closeModal() {
         overlay.classList.remove('active');
         currentTaskId = null;
+        currentRunId = null;
+        currentRuns = [];
         stopAutoRefresh();
         renderedLogCount = 0;
         logsPlainText = '';
         logsLastTraceId = null;
         loadedSolverTraces = {};
+        runTabsContainer.style.display = 'none';
+        btnRerun.style.display = 'none';
     }
 
     function silentLoadResults(taskId) {
@@ -965,8 +1112,10 @@
             .catch(function() {});
     }
 
-    function silentLoadLogs(taskId) {
-        fetch('/tasks/' + taskId + '/logs')
+    function silentLoadLogs(taskId, runId) {
+        var url = '/tasks/' + taskId + '/logs';
+        if (runId) url += '?run_id=' + runId;
+        fetch(url)
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (activeTab !== 'logs' || currentTaskId !== taskId) return;

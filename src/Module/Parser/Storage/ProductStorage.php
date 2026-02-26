@@ -15,7 +15,8 @@ final class ProductStorage implements ProductStorageInterface
 
     public function __construct(
         private readonly PgConnectionPool $pool,
-    ) {}
+    ) {
+    }
 
     public function upsertProduct(ProductData $product, string $taskId): int
     {
@@ -193,6 +194,17 @@ final class ProductStorage implements ProductStorageInterface
                 throw $e;
             }
         });
+    }
+
+    public function saveReviewsForExistingProduct(int $externalId, string $marketplace, array $reviews, string $taskId): void
+    {
+        $productId = $this->getProductIdByExternalId($externalId, $marketplace);
+
+        if ($productId === null) {
+            return;
+        }
+
+        $this->saveReviewsForProduct($productId, $reviews, $taskId);
     }
 
     private function upsertProductInTransaction(\PDO $pdo, ProductData $product, string $taskId): int

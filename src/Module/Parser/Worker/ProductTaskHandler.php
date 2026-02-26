@@ -45,7 +45,8 @@ final class ProductTaskHandler implements TaskHandlerInterface
         private readonly ParseLogger $logger,
         private readonly IdentityPool $identityPool,
         private readonly IdentityPoolConfig $identityPoolConfig,
-    ) {}
+    ) {
+    }
 
     /** {@inheritdoc} */
     public function supports(string $taskType): bool
@@ -172,9 +173,28 @@ final class ProductTaskHandler implements TaskHandlerInterface
         }
 
         $mpName = $params['marketplace'] ?? 'ozon';
-        if ($this->productStorage->isProductPopulated($externalId, $mpName)) {
-            $this->logger->info(sprintf('Товар %d уже заполнен, парсинг пропущен', $externalId));
+        $isPopulated = $this->productStorage->isProductPopulated($externalId, $mpName);
+
+        // Умный rerun: если товар уже заполнен — пропускаем fetch, но собираем отзывы
+        if ($isPopulated && ($params['skip_reviews'] ?? false)) {
+            $this->logger->info(sprintf('Товар %d уже заполнен и skip_reviews=true, парсинг пропущен', $externalId));
             return new TaskResult(parsedItems: 0, skipped: true);
+        }
+
+        if ($isPopulated) {
+            $this->logger->info(sprintf('Товар %d уже заполнен, пропускаем fetch — собираем только отзывы', $externalId));
+
+            $reviewDtos = $this->reviewCollector->collect($apiClient, $reviewParser, $slug, $externalId);
+
+            if (!empty($reviewDtos)) {
+                $this->productStorage->saveReviewsForExistingProduct($externalId, $mpName, $reviewDtos, $taskId);
+                $this->logger->info(sprintf('Отзывы для товара %d собраны: %d', $externalId, count($reviewDtos)));
+            }
+
+            $this->taskStorage->updateTaskProgress($taskId, 1, 1);
+            $this->progressTracker->updateProgress($taskId, 1, 1, 'running');
+
+            return new TaskResult(parsedItems: count($reviewDtos) > 0 ? 1 : 0);
         }
 
         $this->logger->info(sprintf('Парсинг товара: external_id=%d, slug=%s', $externalId, $slug));
@@ -208,7 +228,7 @@ final class ProductTaskHandler implements TaskHandlerInterface
         $categories = $categoryExtractor->extract($response, $htmlData['category'] ?? null);
         if (!empty($categories)) {
             $categoryDtos = array_map(
-                static fn(array $c) => CategoryData::fromArray($c),
+                static fn (array $c) => CategoryData::fromArray($c),
                 $categories,
             );
             $categoryIds = $this->categoryStorage->upsertCategories($categoryDtos, $taskId);

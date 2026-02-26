@@ -72,4 +72,16 @@ interface ProductStorageInterface
      * @return bool true если товар заполнен
      */
     public function isProductPopulated(int $externalId, string $marketplace): bool;
+
+    /**
+     * Сохраняет отзывы для товара, найденного по external_id.
+     *
+     * Используется при умном rerun: товар уже заполнен, нужно дособрать отзывы.
+     *
+     * @param int          $externalId  Внешний идентификатор товара
+     * @param string       $marketplace Маркетплейс
+     * @param ReviewData[] $reviews     Массив отзывов
+     * @param string       $taskId      Идентификатор задачи парсинга
+     */
+    public function saveReviewsForExistingProduct(int $externalId, string $marketplace, array $reviews, string $taskId): void;
 }

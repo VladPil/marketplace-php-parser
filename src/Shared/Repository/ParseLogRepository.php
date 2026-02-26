@@ -75,4 +75,22 @@ class ParseLogRepository extends ServiceEntityRepository
 
         return $qb->getQuery()->getResult();
     }
+
+    /**
+     * Получает логи для конкретного запуска задачи.
+     *
+     * @param string $runId Идентификатор запуска
+     * @param int $limit Максимальное количество записей
+     * @return ParseLog[]
+     */
+    public function findByRunId(string $runId, int $limit = 500): array
+    {
+        return $this->createQueryBuilder('l')
+            ->where('l.runId = :runId')
+            ->setParameter('runId', $runId)
+            ->orderBy('l.createdAt', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
 }

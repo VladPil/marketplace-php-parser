@@ -13,7 +13,8 @@ final class TaskStorage implements TaskStorageInterface
 
     public function __construct(
         private readonly PgConnectionPool $pool,
-    ) {}
+    ) {
+    }
 
     public function updateTaskStatus(string $taskId, string $status, ?string $errorMessage = null): void
     {
@@ -131,4 +132,85 @@ final class TaskStorage implements TaskStorageInterface
         });
     }
 
+
+    /**
+     * Создаёт новый запуск для задачи.
+     *
+     * @return string ID созданного запуска
+     */
+    public function createRun(string $taskId): string
+    {
+        return $this->withConnection(function (\PDO $pdo) use ($taskId): string {
+            // Определяем следующий номер запуска
+            $stmt = $pdo->prepare('SELECT COALESCE(MAX(run_number), 0) + 1 FROM task_runs WHERE task_id = :task_id');
+            $stmt->execute(['task_id' => $taskId]);
+            $runNumber = (int) $stmt->fetchColumn();
+
+            $runId = \Symfony\Component\Uid\Uuid::v4()->toRfc4122();
+            $stmt = $pdo->prepare(
+                'INSERT INTO task_runs (id, task_id, run_number, status, created_at)
+                 VALUES (:id, :task_id, :run_number, :status, NOW())'
+            );
+            $stmt->execute([
+                'id' => $runId,
+                'task_id' => $taskId,
+                'run_number' => $runNumber,
+                'status' => 'pending',
+            ]);
+
+            return $runId;
+        });
+    }
+
+    /**
+     * Обновляет статус запуска.
+     */
+    public function updateRunStatus(string $runId, string $status, ?string $error = null, ?int $parsedItems = null): void
+    {
+        $this->withConnection(function (\PDO $pdo) use ($runId, $status, $error, $parsedItems): void {
+            $fields = ['status = :status'];
+            $params = ['status' => $status, 'run_id' => $runId];
+
+            if ($status === 'running') {
+                $fields[] = 'started_at = NOW()';
+            }
+            if (in_array($status, ['completed_success', 'completed_empty', 'completed_skipped', 'completed_partial', 'failed', 'cancelled'], true)) {
+                $fields[] = 'finished_at = NOW()';
+            }
+            if ($error !== null) {
+                $fields[] = 'error = :error';
+                $params['error'] = $error;
+            }
+            if ($parsedItems !== null) {
+                $fields[] = 'parsed_items = :parsed_items';
+                $params['parsed_items'] = $parsedItems;
+            }
+
+            $sql = sprintf('UPDATE task_runs SET %s WHERE id = :run_id', implode(', ', $fields));
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+        });
+    }
+
+    /**
+     * Обновляет прогресс запуска.
+     */
+    public function updateRunProgress(string $runId, int $parsedItems): void
+    {
+        $this->withConnection(function (\PDO $pdo) use ($runId, $parsedItems): void {
+            $stmt = $pdo->prepare('UPDATE task_runs SET parsed_items = :parsed WHERE id = :run_id');
+            $stmt->execute(['parsed' => $parsedItems, 'run_id' => $runId]);
+        });
+    }
+
+    /**
+     * Сохраняет identity_id в запуске.
+     */
+    public function setRunIdentity(string $runId, string $identityId): void
+    {
+        $this->withConnection(function (\PDO $pdo) use ($runId, $identityId): void {
+            $stmt = $pdo->prepare('UPDATE task_runs SET identity_id = :identity_id WHERE id = :run_id');
+            $stmt->execute(['identity_id' => $identityId, 'run_id' => $runId]);
+        });
+    }
 }

@@ -37,7 +37,8 @@ final class ParseLogger implements LoggerInterface
     public function __construct(
         private readonly ParseLineFormatter $formatter,
         private readonly PgConnectionPool $pool,
-    ) {}
+    ) {
+    }
 
     public function emergency(\Stringable|string $message, array $context = []): void
     {
@@ -84,6 +85,7 @@ final class ParseLogger implements LoggerInterface
         $channel = $context['channel'] ?? 'parser';
         $traceId = TraceContext::getTraceId();
         $taskId = TraceContext::getTaskId();
+        $runId = TraceContext::getRunId();
 
         $displayContext = $context;
         unset($displayContext['channel']);
@@ -93,6 +95,9 @@ final class ParseLogger implements LoggerInterface
         }
         if ($taskId !== null) {
             $displayContext['_task'] = substr($taskId, 0, 8);
+        }
+        if ($runId !== null) {
+            $displayContext['_run'] = substr($runId, 0, 8);
         }
 
         $monologLevel = self::PSR_TO_MONOLOG[$level] ?? Level::Info;
@@ -113,12 +118,13 @@ final class ParseLogger implements LoggerInterface
             $pdo = $this->pool->get();
             try {
                 $stmt = $pdo->prepare(
-                    'INSERT INTO parse_logs (trace_id, parse_task_id, level, channel, message, context)
-                     VALUES (:trace_id, :task_id, :level, :channel, :message, :context)',
+                    'INSERT INTO parse_logs (trace_id, parse_task_id, run_id, level, channel, message, context)
+                     VALUES (:trace_id, :task_id, :run_id, :level, :channel, :message, :context)',
                 );
                 $stmt->execute([
                     'trace_id' => $traceId,
                     'task_id' => $taskId,
+                    'run_id' => $runId,
                     'level' => $level,
                     'channel' => $channel,
                     'message' => (string) $message,

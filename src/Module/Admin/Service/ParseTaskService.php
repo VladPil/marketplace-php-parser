@@ -13,7 +13,8 @@ final class ParseTaskService
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly RedisQueueService $queueService,
-    ) {}
+    ) {
+    }
 
     public function createTask(string $type, array $params, string $marketplace = 'ozon', bool $publishToQueue = true): ParseTask
     {
@@ -81,7 +82,7 @@ final class ParseTaskService
                 $child->setStatus('cancelled');
             }
         }
-        $allCancelIds = [$taskId, ...array_map(fn($c) => $c->getId(), $childTasks)];
+        $allCancelIds = [$taskId, ...array_map(fn ($c) => $c->getId(), $childTasks)];
         $this->queueService->removeTasks($allCancelIds);
         $this->em->flush();
     }
@@ -147,5 +148,33 @@ final class ParseTaskService
             ->getQuery()
             ->execute();
         return (int) $deleted;
+    }
+
+    /**
+     * Перезапускает задачу: сбрасывает статус и публикует в очередь.
+     *
+     * Новый run создаётся воркером при получении задачи.
+     */
+    public function rerunTask(string $taskId): ?ParseTask
+    {
+        $task = $this->em->getRepository(ParseTask::class)->find($taskId);
+
+        if ($task === null) {
+            return null;
+        }
+
+        // Сбрасываем статус задачи на pending
+        $task->setStatus('pending');
+        $this->em->flush();
+
+        // Публикуем в очередь
+        $this->queueService->publishTask([
+            'id' => $task->getId(),
+            'type' => $task->getType(),
+            'params' => array_merge($task->getParams(), ['marketplace' => $task->getMarketplace()]),
+            'marketplace' => $task->getMarketplace(),
+        ]);
+
+        return $task;
     }
 }

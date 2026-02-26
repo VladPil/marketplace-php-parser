@@ -30,6 +30,10 @@ class ParseLog
     #[ORM\Column(type: 'guid', nullable: true)]
     private ?string $parseTaskId = null;
 
+    /** Ссылка на запуск задачи (для группировки логов по запускам) */
+    #[ORM\Column(type: 'guid', nullable: true)]
+    private ?string $runId = null;
+
     /** Уровень лога: debug, info, warning, error */
     #[ORM\Column(length: 10)]
     private string $level = 'info';
@@ -115,5 +119,14 @@ class ParseLog
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
+    }
+    public function getRunId(): ?string
+    {
+        return $this->runId;
+    }
+    public function setRunId(?string $runId): self
+    {
+        $this->runId = $runId;
+        return $this;
     }
 }

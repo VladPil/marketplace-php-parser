@@ -35,15 +35,17 @@ final class DatabaseLogHandler extends AbstractProcessingHandler
         $channel = $context['_channel'] ?? $record->channel;
         $trace = $context['_trace'] ?? '';
         $task = $context['_task'] ?? null;
+        $run = $context['_run'] ?? null;
 
         // Убираем служебные поля
         $dbContext = $context;
-        unset($dbContext['_channel'], $dbContext['_trace'], $dbContext['_task']);
+        unset($dbContext['_channel'], $dbContext['_trace'], $dbContext['_task'], $dbContext['_run']);
 
         try {
             $this->connection->insert('parse_logs', [
                 'trace_id' => $trace !== '' ? $trace : bin2hex(random_bytes(6)),
                 'parse_task_id' => $task,
+                'run_id' => $run,
                 'level' => strtolower($record->level->name),
                 'channel' => $channel,
                 'message' => $record->message,
