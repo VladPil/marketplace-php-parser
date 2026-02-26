@@ -22,7 +22,7 @@ final class ProxyController extends AbstractController
         $adminProxies = $repo->findAll();
         $envProxies = array_map(
             static fn(string $address): array => [
-                'address' => $address,
+                'address' => self::maskProxyCredentials($address),
                 'source' => 'env',
                 'type' => 'static',
                 'proxyId' => md5($address),
@@ -34,8 +34,10 @@ final class ProxyController extends AbstractController
         $adminProxyIds = [];
         $allForStats = $envProxies;
 
+        $maskedAddresses = [];
         foreach ($adminProxies as $proxy) {
             $adminProxyIds[$proxy->getId()] = md5($proxy->getAddress());
+            $maskedAddresses[$proxy->getId()] = self::maskProxyCredentials($proxy->getAddress());
             $allForStats[] = ['address' => $proxy->getAddress(), 'source' => 'admin', 'type' => $proxy->getType()];
         }
 
@@ -46,6 +48,7 @@ final class ProxyController extends AbstractController
             'proxyEnabled' => $httpConfig->proxyEnabled,
             'stats' => $stats,
             'adminProxyIds' => $adminProxyIds,
+            'maskedAddresses' => $maskedAddresses,
         ]);
     }
 
@@ -149,5 +152,14 @@ final class ProxyController extends AbstractController
         $this->addFlash('success', $rotationUrl !== '' ? 'URL ротации сохранён' : 'URL ротации удалён');
 
         return $this->redirectToRoute('proxy_list');
+    }
+
+    /**
+     * Маскирует логин и пароль в адресе прокси для безопасного отображения в UI.
+     * http://user:pass@host:port → http://***:***@host:port
+     */
+    private static function maskProxyCredentials(string $address): string
+    {
+        return preg_replace('#://[^@]+@#', '://***:***@', $address);
     }
 }
