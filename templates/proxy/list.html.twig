@@ -35,6 +35,13 @@
 .col-toggle-panel.open { display: flex; }
 .col-toggle-panel label { font-size: 12px; display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; user-select: none; }
 .col-toggle-panel input[type=checkbox] { margin: 0; }
+.identity-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; font-family: monospace; margin: 1px 0; }
+.identity-ready { background: #dcfce7; color: #166534; }
+.identity-active { background: #dbeafe; color: #1e40af; }
+.identity-quarantine { background: #fee2e2; color: #991b1b; }
+.identity-unknown { background: #e5e7eb; color: #6b7280; }
+.identity-cell { min-width: 120px; }
+.identity-cell .identity-item { display: flex; align-items: center; gap: 4px; font-size: 11px; line-height: 1.6; }
 {% endblock %}
 
 {% block content %}
@@ -147,6 +154,29 @@
     </td>
 {% endmacro %}
 
+{# --- Макрос для отрисовки ячейки identity --- #}
+{% macro identityCell(identities) %}
+    <td data-col="identity" class="identity-cell">
+        {% if identities is not empty %}
+            {% for id in identities %}
+                <div class="identity-item">
+                    <span class="identity-badge identity-{{ id.status }}" title="ID: {{ id.id }}&#10;Статус: {{ id.status }}&#10;Cookies: {{ id.cookies }}{% if id.created_at %}&#10;Создан: {{ id.created_at }}{% endif %}">
+                        {{ id.short_id }}
+                    </span>
+                    <span style="color: #888; font-size: 10px;">{{ id.cookies }}🍪</span>
+                    {% if id.status == 'active' %}
+                        <span style="color: #1e40af; font-size: 10px;">⚡</span>
+                    {% elseif id.status == 'quarantine' %}
+                        <span style="color: #991b1b; font-size: 10px;">⏸</span>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% else %}
+            <span style="color: #ccc;">—</span>
+        {% endif %}
+    </td>
+{% endmacro %}
+
 {% if envProxies is not empty %}
 <div class="card" style="margin-bottom: 20px;">
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
@@ -161,6 +191,7 @@
                 <th data-col="address">Адрес</th>
                 <th data-col="source">Источник</th>
                 <th data-col="type">Тип</th>
+                <th data-col="identity">Identity</th>
                 <th data-col="health" data-sortable>Health</th>
                 <th data-col="cb" data-sortable>Circuit Breaker</th>
                 <th data-col="sessions" data-sortable>Solver-сессии</th>
@@ -171,10 +202,12 @@
         <tbody>
             {% for proxy in envProxies %}
             {% set s = stats.perProxy[proxy.proxyId] | default({type: 'static', health: 1.0, cbState: 'unknown', cbFailures: 0, stickySessions: 0, solverTotal: 0, solverSuccess: 0, solverError: 0, lastUsed: null}) %}
+            {% set proxyIdentities = identitiesByProxyHost[proxy.proxyHost] | default([]) %}
             <tr>
                 <td data-col="address" style="font-family: monospace; font-size: 13px;">{{ proxy.address }}</td>
                 <td data-col="source"><span class="badge badge-info">env</span></td>
                 <td data-col="type"><span style="font-size: 12px;">статический</span></td>
+                {{ _self.identityCell(proxyIdentities) }}
                 {{ _self.proxyStatsRow(s) }}
             </tr>
             {% endfor %}
@@ -203,6 +236,7 @@
                 <th data-col="source">Источник</th>
                 <th data-col="type">Тип</th>
                 <th data-col="status">Статус</th>
+                <th data-col="identity">Identity</th>
                 <th data-col="health" data-sortable>Health</th>
                 <th data-col="cb" data-sortable>Circuit Breaker</th>
                 <th data-col="sessions" data-sortable>Solver-сессии</th>
@@ -217,6 +251,8 @@
             {% for proxy in adminProxies %}
             {% set pid = adminProxyIds[proxy.id] | default('') %}
             {% set s = stats.perProxy[pid] | default({type: proxy.type|default('static'), health: 1.0, cbState: 'unknown', cbFailures: 0, stickySessions: 0, solverTotal: 0, solverSuccess: 0, solverError: 0, lastUsed: null}) %}
+            {% set proxyHost = adminProxyHosts[proxy.id] | default('') %}
+            {% set proxyIdentities = identitiesByProxyHost[proxyHost] | default([]) %}
             <tr style="{{ not proxy.enabled ? 'opacity: 0.5;' : '' }}">
                 <td data-col="address" style="font-family: monospace; font-size: 13px;">{{ maskedAddresses[proxy.id] }}</td>
                 <td data-col="source"><span class="badge" style="background: #8b5cf6;">admin</span></td>
@@ -234,6 +270,7 @@
                         <span class="badge badge-error">отключён</span>
                     {% endif %}
                 </td>
+                {{ _self.identityCell(proxyIdentities) }}
                 {{ _self.proxyStatsRow(s) }}
                 <td data-col="rotation_url" class="rotation-url-cell">
                     {% if proxy.type == 'rotating' %}
@@ -284,6 +321,7 @@
     // Человекочитаемые названия колонок
     var COL_LABELS = {
         address: 'Адрес', source: 'Источник', type: 'Тип', status: 'Статус',
+        identity: 'Identity',
         health: 'Health', cb: 'Circuit Breaker', sessions: 'Solver-сессии',
         sticky: 'Sticky', last_used: 'Посл. использование',
         rotation_url: 'URL ротации', created: 'Добавлен', actions: 'Действия'

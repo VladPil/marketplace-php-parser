@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Module\Admin\Controller;
 
 use App\Module\Parser\Config\HttpConfig;
+use App\Module\Admin\Service\IdentityPoolStats;
 use App\Module\Admin\Service\ProxyStatsService;
 use App\Shared\Entity\Proxy;
 use App\Shared\Repository\ProxyRepository;
@@ -17,8 +18,12 @@ use Symfony\Component\Routing\Attribute\Route;
 final class ProxyController extends AbstractController
 {
     #[Route('/', name: 'proxy_list')]
-    public function list(ProxyRepository $repo, HttpConfig $httpConfig, ProxyStatsService $statsService): Response
-    {
+    public function list(
+        ProxyRepository $repo,
+        HttpConfig $httpConfig,
+        ProxyStatsService $statsService,
+        IdentityPoolStats $identityPoolStats,
+    ): Response {
         $adminProxies = $repo->findAll();
         $envProxies = array_map(
             static fn(string $address): array => [
@@ -26,6 +31,7 @@ final class ProxyController extends AbstractController
                 'source' => 'env',
                 'type' => 'static',
                 'proxyId' => md5($address),
+                'proxyHost' => self::extractProxyHost($address),
             ],
             $httpConfig->proxies,
         );
@@ -35,13 +41,23 @@ final class ProxyController extends AbstractController
         $allForStats = $envProxies;
 
         $maskedAddresses = [];
+        $adminProxyHosts = [];
         foreach ($adminProxies as $proxy) {
             $adminProxyIds[$proxy->getId()] = md5($proxy->getAddress());
             $maskedAddresses[$proxy->getId()] = self::maskProxyCredentials($proxy->getAddress());
+            $adminProxyHosts[$proxy->getId()] = self::extractProxyHost($proxy->getAddress());
             $allForStats[] = ['address' => $proxy->getAddress(), 'source' => 'admin', 'type' => $proxy->getType()];
         }
 
         $stats = $statsService->collectStats($allForStats);
+
+        // Группировка identity по host:port прокси для отображения в таблице
+        $identityStats = $identityPoolStats->getStats();
+        $identitiesByProxyHost = [];
+        foreach ($identityStats['identities'] as $identity) {
+            $identitiesByProxyHost[$identity['proxy_host']][] = $identity;
+        }
+
         return $this->render('proxy/list.html.twig', [
             'adminProxies' => $adminProxies,
             'envProxies' => $envProxies,
@@ -49,6 +65,8 @@ final class ProxyController extends AbstractController
             'stats' => $stats,
             'adminProxyIds' => $adminProxyIds,
             'maskedAddresses' => $maskedAddresses,
+            'adminProxyHosts' => $adminProxyHosts,
+            'identitiesByProxyHost' => $identitiesByProxyHost,
         ]);
     }
 
@@ -161,5 +179,23 @@ final class ProxyController extends AbstractController
     private static function maskProxyCredentials(string $address): string
     {
         return preg_replace('#://[^@]+@#', '://***:***@', $address);
+    }
+
+    /**
+     * Извлекает host:port из URL прокси для сопоставления с identity.
+     */
+    private static function extractProxyHost(string $address): string
+    {
+        $parsed = parse_url($address);
+        if ($parsed === false || !isset($parsed['host'])) {
+            // Формат host:port@user:pass (legacy)
+            $parts = explode('@', $address);
+            return $parts[0];
+        }
+
+        $host = $parsed['host'];
+        $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
+
+        return $host . $port;
     }
 }

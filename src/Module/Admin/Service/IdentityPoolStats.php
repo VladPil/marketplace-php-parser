@@ -42,6 +42,7 @@ final class IdentityPoolStats
      *         id: string,
      *         short_id: string,
      *         proxy: string,
+     *         proxy_host: string,
      *         proxy_type: string,
      *         status: string,
      *         cookies: int,
@@ -81,6 +82,7 @@ final class IdentityPoolStats
 
                     $proxy = $data['proxy_address'] ?? null;
                     $maskedProxy = $proxy !== null ? $this->maskProxy($proxy) : 'direct';
+                    $proxyHost = $proxy !== null ? $this->extractProxyHost($proxy) : 'direct';
 
                     $cookies = 0;
                     if (isset($data['session']['cookies']) && is_array($data['session']['cookies'])) {
@@ -95,6 +97,7 @@ final class IdentityPoolStats
                         'id' => $data['id'] ?? 'unknown',
                         'short_id' => substr($data['id'] ?? 'unknown', 0, 8),
                         'proxy' => $maskedProxy,
+                        'proxy_host' => $proxyHost,
                         'proxy_type' => $data['proxy_type'] ?? 'static',
                         'status' => $data['status'] ?? 'unknown',
                         'cookies' => $cookies,
@@ -127,5 +130,23 @@ final class IdentityPoolStats
         $parts = explode('@', $proxy);
 
         return count($parts) > 1 ? '***@' . end($parts) : $proxy;
+    }
+
+    /**
+     * Извлекает host:port из URL прокси для сопоставления с проксями в админке.
+     */
+    private function extractProxyHost(string $proxy): string
+    {
+        $parsed = parse_url($proxy);
+        if ($parsed === false || !isset($parsed['host'])) {
+            // Формат host:port@user:pass (legacy)
+            $parts = explode('@', $proxy);
+            return $parts[0];
+        }
+
+        $host = $parsed['host'];
+        $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
+
+        return $host . $port;
     }
 }

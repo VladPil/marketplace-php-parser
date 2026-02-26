@@ -164,6 +164,21 @@ final class SolverClient implements SolverClientInterface
                 }
             }
 
+            // Debug-лог: payload перед отправкой в solver для сравнения с Guzzle-запросами
+            $this->logger->debug(
+                sprintf('[solver-debug] fetch payload: %s', $url),
+                [
+                    'proxy' => $proxy !== null ? $this->maskProxy($proxy) : 'direct',
+                    'user_agent' => $session?->userAgent ?? 'not set',
+                    'cookie_names' => $session !== null ? array_map(
+                        static fn(array $c): string => $c['name'],
+                        $session->cookies,
+                    ) : [],
+                    'cookie_count' => $session !== null ? count($session->cookies) : 0,
+                    'has_browser_headers' => $session !== null && !empty($session->browserHeaders),
+                    'channel' => 'solver',
+                ],
+            );
             $response = $this->client->post('/fetch', [
                 'json' => $payload,
                 'headers' => [
@@ -261,6 +276,21 @@ final class SolverClient implements SolverClientInterface
                     $payload['user_agent'] = $session->userAgent;
                 }
             }
+
+            // Debug-лог: payload перед отправкой в solver для HTML-запроса
+            $this->logger->debug(
+                sprintf('[solver-debug] fetchHtml payload: %s', $url),
+                [
+                    'proxy' => $proxy !== null ? $this->maskProxy($proxy) : 'direct',
+                    'user_agent' => $session?->userAgent ?? 'not set',
+                    'cookie_names' => $session !== null ? array_map(
+                        static fn(array $c): string => $c['name'],
+                        $session->cookies,
+                    ) : [],
+                    'cookie_count' => $session !== null ? count($session->cookies) : 0,
+                    'channel' => 'solver',
+                ],
+            );
 
             $response = $this->client->post('/fetch', [
                 'json' => $payload,

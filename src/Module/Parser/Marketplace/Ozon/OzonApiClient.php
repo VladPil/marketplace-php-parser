@@ -340,6 +340,23 @@ final class OzonApiClient implements MarketplaceApiClientInterface
             $options['proxy'] = $proxy;
         }
 
+        // Debug-лог: заголовки, cookies, прокси для сравнения с solver-запросами
+        $this->logger->debug(
+            sprintf('[guzzle-debug] API-запрос: %s', $path),
+            [
+                'headers' => $options['headers'] ?? [],
+                'cookie_names' => array_map(
+                    static fn(array $c): string => $c['name'],
+                    $session->cookies,
+                ),
+                'cookie_count' => count($session->cookies),
+                'proxy' => $proxy !== null ? $this->maskProxy($proxy) : 'direct',
+                'user_agent' => $session->userAgent,
+                'identity_id' => TraceContext::getIdentity()?->id ? substr(TraceContext::getIdentity()->id, 0, 8) : null,
+                'channel' => 'api',
+            ],
+        );
+
         return $this->client->get($path, $options);
     }
 
@@ -384,6 +401,23 @@ final class OzonApiClient implements MarketplaceApiClientInterface
         if ($proxy !== null) {
             $options['proxy'] = $proxy;
         }
+
+        // Debug-лог: заголовки, cookies, прокси для HTML-запроса
+        $this->logger->debug(
+            sprintf('[guzzle-debug] HTML-запрос: %s', $fullUrl),
+            [
+                'headers' => $options['headers'] ?? [],
+                'cookie_names' => array_map(
+                    static fn(array $c): string => $c['name'],
+                    $session->cookies,
+                ),
+                'cookie_count' => count($session->cookies),
+                'proxy' => $proxy !== null ? $this->maskProxy($proxy) : 'direct',
+                'user_agent' => $session->userAgent,
+                'identity_id' => TraceContext::getIdentity()?->id ? substr(TraceContext::getIdentity()->id, 0, 8) : null,
+                'channel' => 'api',
+            ],
+        );
 
         return $this->client->get($fullUrl, $options);
     }
@@ -566,4 +600,23 @@ final class OzonApiClient implements MarketplaceApiClientInterface
 
         return max((int) ($delay * 1000), 1000);
     }
+
+    /**
+     * Маскирует учётные данные в URL прокси для безопасного логирования.
+     */
+    private function maskProxy(string $proxy): string
+    {
+        $parsed = parse_url($proxy);
+        if ($parsed === false || !isset($parsed['host'])) {
+            return '***';
+        }
+
+        $scheme = isset($parsed['scheme']) ? $parsed['scheme'] . '://' : '';
+        $host = $parsed['host'];
+        $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
+        $auth = isset($parsed['user']) ? '***@' : '';
+
+        return $scheme . $auth . $host . $port;
+    }
+
 }
