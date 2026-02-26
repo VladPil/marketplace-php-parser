@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Module\Parser\Worker;
 
 use App\Module\Parser\Config\ParserConfig;
+use App\Module\Parser\Identity\Identity;
+use App\Module\Parser\Identity\IdentityBlockedException;
+use App\Module\Parser\Identity\IdentityPool;
+use App\Module\Parser\Identity\IdentityPoolConfig;
 use App\Module\Parser\Marketplace\MarketplaceRegistry;
 use App\Shared\Contract\DeduplicatorInterface;
 use App\Shared\Contract\ProductStorageInterface;
@@ -14,12 +18,17 @@ use App\Shared\Contract\TaskStorageInterface;
 use App\Shared\DTO\ReviewData;
 use App\Shared\DTO\TaskResult;
 use App\Shared\Logging\ParseLogger;
+use App\Shared\Tracing\TraceContext;
 
 /**
  * Обработчик задач сбора отзывов для товара.
  *
  * Загружает отзывы постранично, дедуплицирует и сохраняет.
  * Останавливается когда все отзывы на странице старше date_from.
+ *
+ * Работает через Identity Pool:
+ *   claim identity → выполнить сбор отзывов → release identity
+ *   При 403 (IdentityBlockedException) → quarantine → claim новую → retry
  */
 final class ReviewsTaskHandler implements TaskHandlerInterface
 {
@@ -31,6 +40,8 @@ final class ReviewsTaskHandler implements TaskHandlerInterface
         private readonly DeduplicatorInterface $deduplicator,
         private readonly ParserConfig $parserConfig,
         private readonly ParseLogger $logger,
+        private readonly IdentityPool $identityPool,
+        private readonly IdentityPoolConfig $identityPoolConfig,
     ) {}
 
     /** {@inheritdoc} */
@@ -46,6 +57,87 @@ final class ReviewsTaskHandler implements TaskHandlerInterface
      * @param array $params Параметры (external_id, slug, max_pages, marketplace, date_from)
      */
     public function handle(string $taskId, array $params): TaskResult
+    {
+        return $this->executeWithIdentity($taskId, $params);
+    }
+
+    /**
+     * Выполняет сбор отзывов с привязкой к identity из пула.
+     *
+     * @param int $attempt Текущая попытка (0-based)
+     */
+    private function executeWithIdentity(string $taskId, array $params, int $attempt = 0): TaskResult
+    {
+        $identity = $this->identityPool->claim($taskId);
+
+        if ($identity !== null) {
+            TraceContext::setIdentity($identity);
+            $this->logger->info(sprintf(
+                'Identity %s привязана к задаче отзывов (прокси: %s, попытка %d)',
+                substr($identity->id, 0, 8),
+                $identity->maskedProxy(),
+                $attempt + 1,
+            ));
+        } else {
+            $this->logger->warning(sprintf(
+                'Нет готовых identity в пуле для задачи отзывов (попытка %d)',
+                $attempt + 1,
+            ));
+        }
+
+        try {
+            $result = $this->doHandle($taskId, $params);
+
+            if ($identity !== null) {
+                $this->identityPool->release($identity);
+            }
+
+            return $result;
+        } catch (IdentityBlockedException $e) {
+            if ($identity !== null) {
+                if ($identity->proxyType === 'rotating') {
+                    $this->identityPool->release($identity);
+                    $this->logger->info(sprintf(
+                        'Identity %s (rotating) получила 403 — возвращена в пул (IP сменится автоматически, попытка %d/%d)',
+                        substr($identity->id, 0, 8),
+                        $attempt + 1,
+                        $this->identityPoolConfig->maxIdentityRetries,
+                    ));
+                } else {
+                    $this->identityPool->quarantine($identity);
+                    $this->logger->warning(sprintf(
+                        'Identity %s заблокирована (403) в задаче отзывов, карантин (попытка %d/%d)',
+                        substr($identity->id, 0, 8),
+                        $attempt + 1,
+                        $this->identityPoolConfig->maxIdentityRetries,
+                    ));
+                }
+            }
+
+            if ($attempt < $this->identityPoolConfig->maxIdentityRetries) {
+                TraceContext::setIdentity(null);
+                return $this->executeWithIdentity($taskId, $params, $attempt + 1);
+            }
+
+            throw new \RuntimeException(
+                sprintf('Все identity заблокированы после %d попыток (задача отзывов)', $attempt + 1),
+                0,
+                $e,
+            );
+        } catch (\Throwable $e) {
+            if ($identity !== null) {
+                $this->identityPool->release($identity);
+            }
+            throw $e;
+        } finally {
+            TraceContext::setIdentity(null);
+        }
+    }
+
+    /**
+     * Основная логика сбора отзывов (без обёртки identity).
+     */
+    private function doHandle(string $taskId, array $params): TaskResult
     {
         $marketplace = $this->marketplaceRegistry->get($params['marketplace'] ?? 'ozon');
         $apiClient = $marketplace->getApiClient();

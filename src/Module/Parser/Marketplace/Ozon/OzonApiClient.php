@@ -9,10 +9,7 @@ use App\Module\Parser\Config\RetryConfig;
 use App\Module\Parser\Identity\Identity;
 use App\Module\Parser\Identity\IdentityBlockedException;
 use App\Module\Parser\Identity\IdentityPoolConfig;
-use App\Module\Parser\Proxy\ProxyRotatorInterface;
-use App\Module\Parser\Proxy\ProxySelection;
 use App\Shared\Contract\MarketplaceApiClientInterface;
-use App\Shared\Contract\SessionManagerInterface;
 use App\Shared\Contract\SolverClientInterface;
 use App\Shared\DTO\SessionData;
 use App\Shared\Logging\ParseLogger;
@@ -29,11 +26,8 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * HTTP-клиент для взаимодействия с API Ozon.
  *
- * Два режима работы:
- * 1. Identity Pool (новый): identity из TraceContext → фиксированный прокси + cookies на всю задачу
- * 2. Legacy: per-request выбор прокси через CompositeProxyRotator + SessionManager
- *
- * Identity Pool активируется автоматически при наличии Identity в TraceContext.
+ * Работает исключительно через Identity Pool: identity из TraceContext → фиксированный прокси + cookies на всю задачу.
+ * Запросы без identity не поддерживаются — будет выброшено исключение.
  */
 final class OzonApiClient implements MarketplaceApiClientInterface
 {
@@ -43,10 +37,8 @@ final class OzonApiClient implements MarketplaceApiClientInterface
         private readonly HttpConfig $httpConfig,
         private readonly RetryConfig $retryConfig,
         private readonly OzonHeadersProvider $headersProvider,
-        private readonly SessionManagerInterface $sessionManager,
         private readonly SolverClientInterface $solverClient,
         private readonly ParseLogger $logger,
-        private readonly ProxyRotatorInterface $proxyRotator,
         private readonly IdentityPoolConfig $identityPoolConfig,
     ) {
         $this->client = $this->createClient();
@@ -55,21 +47,21 @@ final class OzonApiClient implements MarketplaceApiClientInterface
     public function fetchPage(string $path, array $queryParams = []): array
     {
         $identity = TraceContext::getIdentity();
-        if ($identity !== null) {
-            return $this->fetchPageWithIdentity($path, $queryParams, $identity);
+        if ($identity === null) {
+            throw new \RuntimeException('Identity не установлена в TraceContext — запросы без identity не поддерживаются');
         }
 
-        return $this->fetchPageLegacy($path, $queryParams);
+        return $this->fetchPageWithIdentity($path, $queryParams, $identity);
     }
 
     public function fetchProductHtml(string $slug, int $externalId): string
     {
         $identity = TraceContext::getIdentity();
-        if ($identity !== null) {
-            return $this->fetchProductHtmlWithIdentity($slug, $externalId, $identity);
+        if ($identity === null) {
+            throw new \RuntimeException('Identity не установлена в TraceContext — запросы без identity не поддерживаются');
         }
 
-        return $this->fetchProductHtmlLegacy($slug, $externalId);
+        return $this->fetchProductHtmlWithIdentity($slug, $externalId, $identity);
     }
 
     // ─── Identity Pool ─────────────────────────────────────────────────
@@ -227,133 +219,6 @@ final class OzonApiClient implements MarketplaceApiClientInterface
         return $fetchResult['html'];
     }
 
-    // ─── Legacy (без Identity Pool) ────────────────────────────────────
-
-    private function fetchPageLegacy(string $path, array $queryParams): array
-    {
-        $selection = $this->selectProxyWithRotator();
-        $proxy = $selection->address;
-        $proxyKey = $selection->sessionKey;
-
-        $session = $this->sessionManager->getSession($proxyKey);
-        if ($session !== null) {
-            $this->logger->info(
-                sprintf('Guzzle запрос: %s (прокси: %s)', $path, $proxyKey),
-                ['channel' => 'api', 'proxy_source' => $selection->source],
-            );
-
-            try {
-                $response = $this->doGuzzleRequest($path, $queryParams, $proxy, $session);
-                $status = $response->getStatusCode();
-                if ($status !== Response::HTTP_FORBIDDEN) {
-                    $body = $response->getBody()->getContents();
-                    $this->logger->info(
-                        sprintf('Guzzle ответ: HTTP %d, размер=%d байт', $status, strlen($body)),
-                        ['channel' => 'api', 'proxy_source' => $selection->source],
-                    );
-                    $this->proxyRotator->recordSuccess($selection->id);
-                    return json_decode($body, true) ?? [];
-                }
-                $this->logger->warning(
-                    sprintf('Guzzle получил HTTP %d на %s — переключаюсь на browser fetch', Response::HTTP_FORBIDDEN, $path),
-                    ['proxy' => $proxyKey, 'channel' => 'api', 'proxy_source' => $selection->source],
-                );
-                $this->proxyRotator->recordFailure($selection->id);
-                $this->sessionManager->invalidateSession($proxyKey);
-            } catch (\Throwable $e) {
-                $this->proxyRotator->recordFailure($selection->id);
-                $this->sessionManager->invalidateSession($proxyKey);
-                $this->logger->warning(
-                    sprintf('Guzzle exception на %s — переключаюсь на browser fetch: %s', $path, $e->getMessage()),
-                    ['proxy' => $proxyKey, 'channel' => 'api'],
-                );
-            }
-        }
-        return $this->fetchViaBrowser($path, $queryParams, $proxy, $proxyKey, $selection);
-    }
-
-    private function fetchViaBrowser(string $path, array $queryParams, ?string $proxy, string $proxyKey, ProxySelection $selection): array
-    {
-        $fullUrl = $this->buildFullUrl($path, $queryParams);
-
-        $this->logger->info(
-            sprintf('Browser fetch: %s', $fullUrl),
-            ['proxy' => $proxyKey, 'channel' => 'api'],
-        );
-
-        $fetchResult = $this->solverClient->fetch($fullUrl, $proxy);
-
-        if ($fetchResult === null) {
-            $this->proxyRotator->recordFailure($selection->id);
-            $this->logger->error(
-                sprintf('Browser fetch не вернул данных для %s — записан failure для прокси %s', $path, $proxyKey),
-                ['url' => $fullUrl, 'proxy' => $proxyKey, 'channel' => 'api'],
-            );
-            return [];
-        }
-
-        $this->proxyRotator->recordSuccess($selection->id);
-
-        $fetchSession = $fetchResult['_session'] ?? null;
-        if ($fetchSession instanceof SessionData) {
-            $this->sessionManager->cacheSession($proxyKey, $fetchSession);
-            $this->logger->info(
-                sprintf('Cookies от browser fetch закешированы (%d cookies)', count($fetchSession->cookies)),
-                ['proxy' => $proxyKey, 'channel' => 'solver'],
-            );
-        }
-
-        unset($fetchResult['_session']);
-        return $fetchResult;
-    }
-
-    private function fetchProductHtmlLegacy(string $slug, int $externalId): string
-    {
-        $selection = $this->selectProxyWithRotator();
-        $proxy = $selection->address;
-        $proxyKey = $selection->sessionKey;
-
-        $productPath = $slug !== ''
-            ? sprintf('/product/%s-%d/', $slug, $externalId)
-            : sprintf('/product/%d/', $externalId);
-
-        $fullUrl = sprintf('https://www.ozon.ru%s', $productPath);
-
-        $this->logger->info(
-            sprintf('Загрузка HTML страницы товара: %s', $fullUrl),
-            ['proxy' => $proxyKey, 'channel' => 'api'],
-        );
-
-        $fetchResult = $this->solverClient->fetchHtml($fullUrl, $proxy);
-
-        if ($fetchResult === null) {
-            $this->proxyRotator->recordFailure($selection->id);
-            throw new \RuntimeException(sprintf(
-                'Solver не смог загрузить HTML товара %d (URL: %s). Возможно, Ozon заблокировал запрос (403)',
-                $externalId,
-                $fullUrl,
-            ));
-        }
-
-        $fetchSession = $fetchResult['session'] ?? null;
-        if ($fetchSession instanceof SessionData && count($fetchSession->cookies) > 0) {
-            $this->proxyRotator->recordSuccess($selection->id);
-            $this->sessionManager->cacheSession($proxyKey, $fetchSession);
-            $this->logger->info(
-                sprintf('Cookies от HTML fetch закешированы (%d cookies)', count($fetchSession->cookies)),
-                ['proxy' => $proxyKey, 'channel' => 'solver'],
-            );
-        } else {
-            $this->proxyRotator->recordFailure($selection->id);
-            $this->logger->warning(
-                sprintf('[proxy] HTML получен, но без cookies (прокси %s) — записан failure', $proxyKey),
-                ['proxy' => $proxyKey, 'channel' => 'proxy'],
-            );
-        }
-
-        return $fetchResult['html'];
-    }
-
     // ─── Общие методы ──────────────────────────────────────────────────
 
     private function doGuzzleRequest(
@@ -393,7 +258,6 @@ final class OzonApiClient implements MarketplaceApiClientInterface
 
         return $this->client->get($path, $options);
     }
-
 
     /**
      * Guzzle-запрос для загрузки HTML страницы по полному URL.
@@ -472,7 +336,6 @@ final class OzonApiClient implements MarketplaceApiClientInterface
         return $jar;
     }
 
-
     public function fetchProduct(string $slug, int $externalId): array
     {
         $url = sprintf('/product/%s-%d/', $slug, $externalId);
@@ -519,11 +382,6 @@ final class OzonApiClient implements MarketplaceApiClientInterface
         return $this->fetchPage('/api/entrypoint-api.bx/page/json/v2', [
             'url' => $nextPageUrl,
         ]);
-    }
-
-    private function selectProxyWithRotator(): ProxySelection
-    {
-        return $this->proxyRotator->selectProxy(TraceContext::getTaskId());
     }
 
     private function buildFullUrl(string $path, array $queryParams): string
