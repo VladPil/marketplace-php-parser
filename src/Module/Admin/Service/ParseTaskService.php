@@ -6,6 +6,8 @@ namespace App\Module\Admin\Service;
 
 use App\Shared\Entity\ParseLog;
 use App\Shared\Entity\ParseTask;
+use App\Shared\Entity\TaskRun;
+use App\Shared\Repository\TaskRunRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class ParseTaskService
@@ -151,9 +153,10 @@ final class ParseTaskService
     }
 
     /**
-     * Перезапускает задачу: сбрасывает статус и публикует в очередь.
+     * Перезапускает задачу: создаёт новый run и публикует в очередь.
      *
-     * Новый run создаётся воркером при получении задачи.
+     * Run создаётся сразу (виден в админке), воркер получает run_id
+     * и использует готовый run вместо создания нового.
      */
     public function rerunTask(string $taskId): ?ParseTask
     {
@@ -163,16 +166,33 @@ final class ParseTaskService
             return null;
         }
 
+        /** @var TaskRunRepository $runRepo */
+        $runRepo = $this->em->getRepository(TaskRun::class);
+
+        // Защита от двойного rerun: если уже есть pending run — не создаём новый
+        $latestRun = $runRepo->findLatestByTaskId($taskId);
+        if ($latestRun !== null && $latestRun->getStatus() === 'pending') {
+            $run = $latestRun;
+        } else {
+            $nextRunNumber = $runRepo->getNextRunNumber($taskId);
+
+            $run = new TaskRun();
+            $run->setTaskId($taskId);
+            $run->setRunNumber($nextRunNumber);
+            $this->em->persist($run);
+        }
+
         // Сбрасываем статус задачи на pending
         $task->setStatus('pending');
         $this->em->flush();
 
-        // Публикуем в очередь
+        // Публикуем в очередь с run_id — воркер использует готовый run
         $this->queueService->publishTask([
             'id' => $task->getId(),
             'type' => $task->getType(),
             'params' => array_merge($task->getParams(), ['marketplace' => $task->getMarketplace()]),
             'marketplace' => $task->getMarketplace(),
+            'run_id' => $run->getId(),
         ]);
 
         return $task;

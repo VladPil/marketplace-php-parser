@@ -92,8 +92,10 @@ final class ParseWorker
             }
 
             try {
-                // Создаём запуск (run) для задачи
-                $runId = $this->taskStorage->createRun($taskId);
+                // Используем run_id из сообщения (создан админкой при rerun) или создаём новый
+                $runId = isset($task['run_id']) && $task['run_id'] !== ''
+                    ? $task['run_id']
+                    : $this->taskStorage->createRun($taskId);
                 TraceContext::setRunId($runId);
 
                 $this->taskStorage->updateRunStatus($runId, 'running');
