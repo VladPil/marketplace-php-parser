@@ -36,31 +36,54 @@ final class IdentityWarmer
 
         while ($this->running) {
             try {
-                $this->warmOnce();
+                $result = $this->warmOnce();
             } catch (\Throwable $e) {
                 $this->logger->error(sprintf('[warmer] Ошибка итерации: %s', $e->getMessage()));
+                $result = ['warmed' => 0, 'failed' => 0, 'attempted' => 0, 'errors' => [$e->getMessage()]];
+            }
+
+            $stats = $this->pool->getStats();
+            $mode = $stats['ready'] === 0 ? 'emergency' : 'normal';
+
+            try {
+                $this->pool->writeWarmerStatus([
+                    'last_run_at' => microtime(true),
+                    'warmed' => $result['warmed'],
+                    'failed' => $result['failed'],
+                    'attempted' => $result['attempted'],
+                    'last_errors' => array_slice($result['errors'], -5),
+                    'mode' => $mode,
+                    'pool_ready' => $stats['ready'],
+                    'pool_active' => $stats['active'],
+                    'pool_quarantine' => $stats['quarantine'],
+                ]);
+            } catch (\Throwable) {
+                // Don't let status write failure break the warmer loop
             }
 
             if (!$this->running) {
                 break;
             }
 
-            // Swoole-совместимый sleep (не блокирует event loop)
+            $sleepSeconds = $stats['ready'] === 0
+                ? min(10, $this->config->warmerIntervalSeconds)
+                : $this->config->warmerIntervalSeconds;
+
             if (class_exists(\Swoole\Coroutine::class)) {
-                \Swoole\Coroutine::sleep($this->config->warmerIntervalSeconds);
+                \Swoole\Coroutine::sleep($sleepSeconds);
             } else {
-                sleep($this->config->warmerIntervalSeconds);
+                sleep($sleepSeconds);
             }
         }
 
         $this->logger->info('[warmer] Остановлен');
     }
 
-    public function warmOnce(): void
+    public function warmOnce(): array
     {
         $proxies = $this->proxyProvider->getAll();
         if (empty($proxies)) {
-            return;
+            return ['warmed' => 0, 'failed' => 0, 'attempted' => 0, 'errors' => []];
         }
 
         $allIdentities = $this->pool->getAllIdentities();
@@ -115,25 +138,28 @@ final class IdentityWarmer
         }
 
         if (empty($toWarm)) {
-            return;
+            return ['warmed' => 0, 'failed' => 0, 'attempted' => 0, 'errors' => []];
         }
 
         $this->logger->info(sprintf('[warmer] Прогрев %d identity параллельно...', count($toWarm)));
 
         $warmed = 0;
         $warmedAddresses = []; // Адреса с успешным прогревом — для последующей очистки устаревших
+        $errors = [];
 
         if (class_exists(\Swoole\Coroutine\WaitGroup::class)) {
             $wg = new \Swoole\Coroutine\WaitGroup();
 
             foreach ($toWarm as $item) {
                 $wg->add();
-                \Swoole\Coroutine::create(function () use ($wg, $item, &$warmed, &$warmedAddresses) {
+                \Swoole\Coroutine::create(function () use ($wg, $item, &$warmed, &$warmedAddresses, &$errors) {
                     try {
                         $identity = $this->pool->warmIdentity($item['address'], $item['type']);
                         if ($identity !== null) {
                             $warmed++;
                             $warmedAddresses[] = $item['address'];
+                        } else {
+                            $errors[] = sprintf('[warmer] warmIdentity вернул null для %s', $item['address'] ?? 'direct');
                         }
                     } catch (\Throwable $e) {
                         $this->logger->error(sprintf(
@@ -141,6 +167,7 @@ final class IdentityWarmer
                             $item['address'] ?? 'direct',
                             $e->getMessage(),
                         ));
+                        $errors[] = $e->getMessage();
                     } finally {
                         $wg->done();
                     }
@@ -154,6 +181,8 @@ final class IdentityWarmer
                 if ($identity !== null) {
                     $warmed++;
                     $warmedAddresses[] = $item['address'];
+                } else {
+                    $errors[] = sprintf('[warmer] warmIdentity вернул null для %s', $item['address'] ?? 'direct');
                 }
             }
         }
@@ -187,6 +216,7 @@ final class IdentityWarmer
                 $stats['quarantine'],
             ));
         }
+        return ['warmed' => $warmed, 'failed' => count($toWarm) - $warmed, 'attempted' => count($toWarm), 'errors' => $errors];
     }
 
     public function stop(): void

@@ -173,10 +173,32 @@ final class ReviewsTaskHandler implements TaskHandlerInterface
 
         $this->logger->info(sprintf('Загрузка первой страницы отзывов для товара %d', $externalId));
         $response = $apiClient->fetchReviewsFirstPage($slug, $externalId);
+
+        // Debug: логируем структуру ответа для диагностики
+        $widgetKeys = array_keys($response['widgetStates'] ?? []);
+        $this->logger->debug(sprintf(
+            'Ответ API: %d ключей в widgetStates, nextPage=%s, widgetKeys: %s',
+            count($widgetKeys),
+            isset($response['nextPage']) ? mb_substr($response['nextPage'], 0, 100) : 'null',
+            implode(', ', $widgetKeys),
+        ));
         $pageNum = 1;
 
         while (true) {
             $reviews = $reviewParser->parse($response);
+
+            // Debug: если 0 отзывов, дампим ключи ответа для диагностики
+            if (count($reviews) === 0) {
+                $responseKeys = array_keys($response);
+                $wsKeys = array_keys($response['widgetStates'] ?? []);
+                $this->logger->warning(sprintf(
+                    '0 отзывов на странице %d. response keys: [%s], widgetStates keys: [%s], response size: %d',
+                    $pageNum,
+                    implode(', ', $responseKeys),
+                    implode(', ', $wsKeys),
+                    strlen(json_encode($response)),
+                ));
+            }
 
             $freshOnPage = 0;
             $oldOnPage = 0;

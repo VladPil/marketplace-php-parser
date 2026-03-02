@@ -124,6 +124,58 @@
             </tbody>
         </table>
 
+        <div style="margin-top: 16px; padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <h3 style="font-size: 15px; margin-bottom: 8px;">🔥 Warmer</h3>
+            {% if warmer.available %}
+                <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+                    <div>
+                        <span style="color: #6b7280; font-size: 12px;">Режим</span><br>
+                        {% if warmer.mode|default('normal') == 'emergency' %}
+                            <span class="badge badge-error">🚨 Emergency (10с)</span>
+                        {% else %}
+                            <span class="badge badge-success">Normal (30с)</span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <span style="color: #6b7280; font-size: 12px;">Последний цикл</span><br>
+                        <strong>{{ warmer.last_run_formatted|default('—') }}</strong>
+                        {% if warmer.last_run_ago is defined %}
+                            <span style="color: #6b7280;"> ({{ warmer.last_run_ago }}с назад)</span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <span style="color: #6b7280; font-size: 12px;">Прогрето</span><br>
+                        <span style="color: #10b981; font-weight: 600;">{{ warmer.warmed|default(0) }}</span>
+                    </div>
+                    <div>
+                        <span style="color: #6b7280; font-size: 12px;">Ошибки</span><br>
+                        {% if warmer.failed|default(0) > 0 %}
+                            <span style="color: #ef4444; font-weight: 600;">{{ warmer.failed }}</span>
+                        {% else %}
+                            <span>0</span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <span style="color: #6b7280; font-size: 12px;">Пул ready</span><br>
+                        {% if warmer.pool_ready|default(0) == 0 %}
+                            <span style="color: #ef4444; font-weight: 600;">0</span>
+                        {% else %}
+                            <span style="color: #10b981; font-weight: 600;">{{ warmer.pool_ready }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if warmer.last_errors is defined and warmer.last_errors is not empty %}
+                    <div style="margin-top: 8px; padding: 8px; background: #fef2f2; border-radius: 4px; font-size: 12px; color: #991b1b;">
+                        {% for err in warmer.last_errors %}
+                            <div>⚠ {{ err }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% else %}
+                <span style="color: #999;">Warmer ещё не запускался или данные недоступны</span>
+            {% endif %}
+        </div>
+
         {% if identity_pool.identities is not empty %}
             <h3 style="margin-top: 16px; font-size: 15px;">Детализация</h3>
             <table style="margin-top: 8px;">
@@ -135,6 +187,7 @@
                         <th>Статус</th>
                         <th>Cookies</th>
                         <th>Создана</th>
+                        <th>TTL</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -156,10 +209,29 @@
                             </td>
                             <td>{{ id.cookies }}</td>
                             <td>{{ id.created_at }}</td>
+                            <td>
+                                {% if id.ttl_remaining is not null %}
+                                    {% if id.warmth_pct > 50 %}
+                                        <span style="color: #10b981; font-weight: 600;">{{ (id.ttl_remaining / 60)|round(1) }}м</span>
+                                    {% elseif id.warmth_pct > 25 %}
+                                        <span style="color: #f59e0b; font-weight: 600;">{{ (id.ttl_remaining / 60)|round(1) }}м</span>
+                                    {% else %}
+                                        <span style="color: #ef4444; font-weight: 600;">{{ (id.ttl_remaining / 60)|round(1) }}м</span>
+                                    {% endif %}
+                                    <div style="width: 60px; height: 4px; background: #e5e7eb; border-radius: 2px; margin-top: 2px;">
+                                        <div style="width: {{ id.warmth_pct }}%; height: 100%; border-radius: 2px; background: {% if id.warmth_pct > 50 %}#10b981{% elseif id.warmth_pct > 25 %}#f59e0b{% else %}#ef4444{% endif %};"></div>
+                                    </div>
+                                {% else %}
+                                    <span style="color: #999;">—</span>
+                                {% endif %}
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>
             </table>
         {% endif %}
     </div>
+    <script>
+        setTimeout(function() { window.location.reload(); }, 5000);
+    </script>
 {% endblock %}

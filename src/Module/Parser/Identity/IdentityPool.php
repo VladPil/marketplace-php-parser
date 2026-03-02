@@ -302,6 +302,13 @@ final class IdentityPool
         });
     }
 
+    public function writeWarmerStatus(array $status): void
+    {
+        $this->withRedis(static function (\Redis $redis) use ($status): void {
+            $redis->set('mp:identity:warmer:status', json_encode($status, JSON_UNESCAPED_UNICODE));
+        });
+    }
+
     /**
      * Полная очистка пула (для отладки / перезапуска).
      */

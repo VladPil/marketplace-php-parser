@@ -27,9 +27,11 @@ final class HealthController extends AbstractController
     {
         $solver = $solverChecker->check();
         $identityPool = $identityStats->getStats();
+        $warmerStatus = $identityStats->getWarmerStatus();
         return $this->render('health/index.html.twig', [
             'solver' => $solver,
             'identity_pool' => $identityPool,
+            'warmer' => $warmerStatus,
         ]);
     }
 
@@ -41,9 +43,11 @@ final class HealthController extends AbstractController
     {
         $solver = $solverChecker->check();
         $identityPool = $identityStats->getStats();
+        $warmerStatus = $identityStats->getWarmerStatus();
         return $this->json([
             'solver' => $solver,
             'identity_pool' => $identityPool,
+            'warmer' => $warmerStatus,
             'status' => $solver['available'] ? 'ok' : 'degraded',
         ]);
     }

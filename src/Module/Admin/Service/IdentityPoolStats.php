@@ -93,6 +93,17 @@ final class IdentityPoolStats
                         ? date('Y-m-d H:i:s', (int) $data['created_at'])
                         : null;
 
+                    $ttlSeconds = 1200;
+                    $ttlRemaining = null;
+                    $warmthPct = null;
+                    $expiresAt = null;
+                    if (isset($data['created_at'])) {
+                        $age = time() - (int) $data['created_at'];
+                        $ttlRemaining = max(0, $ttlSeconds - $age);
+                        $warmthPct = (int) round(($ttlRemaining / $ttlSeconds) * 100);
+                        $expiresAt = date('H:i:s', (int) $data['created_at'] + $ttlSeconds);
+                    }
+
                     $identities[] = [
                         'id' => $data['id'] ?? 'unknown',
                         'short_id' => substr($data['id'] ?? 'unknown', 0, 8),
@@ -103,6 +114,9 @@ final class IdentityPoolStats
                         'cookies' => $cookies,
                         'created_at' => $createdAt,
                         'claimed_by' => $data['claimed_by'] ?? null,
+                        'ttl_remaining' => $ttlRemaining,
+                        'warmth_pct' => $warmthPct,
+                        'expires_at' => $expiresAt,
                     ];
                 }
             }
@@ -122,6 +136,28 @@ final class IdentityPoolStats
                 'total' => 0,
                 'identities' => [],
             ];
+        }
+    }
+
+    public function getWarmerStatus(): array
+    {
+        try {
+            $json = $this->redis->get('mp:identity:warmer:status');
+            if ($json === false || !is_string($json)) {
+                return ['available' => false];
+            }
+            $data = json_decode($json, true);
+            if (!is_array($data)) {
+                return ['available' => false];
+            }
+            $data['available'] = true;
+            if (isset($data['last_run_at'])) {
+                $data['last_run_ago'] = (int) (microtime(true) - $data['last_run_at']);
+                $data['last_run_formatted'] = date('H:i:s', (int) $data['last_run_at']);
+            }
+            return $data;
+        } catch (\Throwable) {
+            return ['available' => false];
         }
     }
 

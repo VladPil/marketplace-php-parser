@@ -354,11 +354,14 @@ final class OzonApiClient implements MarketplaceApiClientInterface
             ? sprintf('/product/%s-%d/', $slug, $externalId)
             : sprintf('/product/%d/', $externalId);
 
-        return $this->fetchPage('/api/entrypoint-api.bx/page/json/v2', [
-            'url' => $productPath,
+        $innerParams = http_build_query([
             'layout_container' => 'reviewshelfpaginator',
             'layout_page_index' => $page + 2,
             'page' => $page,
+        ]);
+
+        return $this->fetchPage('/api/entrypoint-api.bx/page/json/v2', [
+            'url' => $productPath . '?' . $innerParams,
         ]);
     }
 
@@ -368,12 +371,19 @@ final class OzonApiClient implements MarketplaceApiClientInterface
             ? sprintf('/product/%s-%d/', $slug, $externalId)
             : sprintf('/product/%d/', $externalId);
 
-        return $this->fetchPage('/api/entrypoint-api.bx/page/json/v2', [
-            'url' => $productPath,
+        // Все параметры пагинации должны быть вложены в url= параметр,
+        // иначе Ozon API их игнорирует и возвращает пустой ответ без отзывов
+        $innerParams = http_build_query([
             'layout_container' => 'reviewshelfpaginator',
             'layout_page_index' => 3,
             'tab' => 'reviews',
             'sort' => 'published_at_desc',
+        ]);
+
+        $urlWithParams = $productPath . '?' . $innerParams;
+
+        return $this->fetchPage('/api/entrypoint-api.bx/page/json/v2', [
+            'url' => $urlWithParams,
         ]);
     }
 
